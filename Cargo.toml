@@ -1,0 +1,45 @@
+[package]
+name = "gfx-hal-tutorial"
+version = "0.1.0"
+authors = ["Joshua Groves <josh@joshgroves.com>"]
+
+[features]
+default = []
+metal = ["gfx-backend-metal"]
+dx12 = ["gfx-backend-dx12"]
+vulkan = ["gfx-backend-vulkan"]
+
+[dependencies]
+winit = "0.12"
+gfx-hal = { version = "0.1", git = "https://github.com/gfx-rs/gfx" }
+
+[dependencies.gfx-backend-vulkan]
+version = "0.1"
+git = "https://github.com/gfx-rs/gfx"
+optional = true
+
+[target.'cfg(target_os = "macos")'.dependencies.gfx-backend-metal]
+version = "0.1"
+git = "https://github.com/gfx-rs/gfx"
+optional = true
+
+[target.'cfg(windows)'.dependencies.gfx-backend-dx12]
+version = "0.1"
+git = "https://github.com/gfx-rs/gfx"
+optional = true
+
+[[bin]]
+name = "00_base_code"
+path = "src/00_base_code.rs"
+
+[[bin]]
+name = "01_instance_creation"
+path = "src/01_instance_creation.rs"
+
+[[bin]]
+name = "02_validation_layers"
+path = "src/02_validation_layers.rs"
+
+[[bin]]
+name = "03_physical_device_selection"
+path = "src/03_physical_device_selection.rs"
