@@ -1,5 +1,7 @@
 # gfx-hal-tutorial
 
+[![Join the chat at https://gitter.im/grovesNL/gfx-hal-tutorial](https://badges.gitter.im/grovesNL/gfx-hal-tutorial.svg)](https://gitter.im/grovesNL/gfx-hal-tutorial?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+
 Reimplementing examples from [Vulkan Tutorial](https://vulkan-tutorial.com/) with Rust and [gfx-hal](https://vulkan-tutorial.com).
 
 ## License
