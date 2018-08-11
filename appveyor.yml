@@ -1,0 +1,35 @@
+os: Visual Studio 2015
+
+environment:
+  global:
+    CHANNEL: stable
+    CRATE_NAME: gfx-hal-tutorial
+    TARGET: x86_64-pc-windows-msvc
+
+install:
+  - curl -sSf -o rustup-init.exe https://win.rustup.rs
+  - rustup-init.exe --default-host %TARGET% --default-toolchain %CHANNEL% -y
+  - set PATH=%PATH%;C:\msys64\mingw64\bin;C:\Users\appveyor\.cargo\bin
+  - rustc -Vv
+  - cargo -V
+
+build_script:
+  - cargo build --verbose --all --features dx12 --target %TARGET%
+
+branches:
+  only:
+    - staging
+    - trying
+    - master
+  except:
+    - staging.tmp
+
+notifications:
+  - provider: Webhook
+    url: https://webhooks.gitter.im/e/3b63eac0174975b2edc5
+    on_build_success: false
+    on_build_failure: true
+    on_build_status_changed: true
+
+cache:
+- C:\Users\appveyor\.cargo

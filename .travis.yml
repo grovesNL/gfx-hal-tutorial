@@ -1,0 +1,40 @@
+language: rust
+rust:
+  - stable
+cache:
+  cargo: true
+branches:
+  only:
+    - staging
+    - trying
+    - master
+  except:
+    - staging.tmp
+matrix:
+  include:
+    - os: osx
+      osx_image: xcode9
+      compiler: clang
+      env:
+        - JOB="metal"
+    - os: linux
+      compiler: gcc
+      env:
+        - JOB="vulkan"
+      addons:
+        apt:
+          sources:
+            - llvm-toolchain-precise
+            - ubuntu-toolchain-r-test
+          packages:
+            - g++-5
+notifications:
+  webhooks:
+    urls:
+      - https://webhooks.gitter.im/e/416d6e1e41c9dfaa71b7
+    on_success: change
+    on_failure: always
+    on_start: never
+script:
+  - if [[ $JOB == "metal" ]]; then export CXX=clang++ && export MACOSX_DEPLOYMENT_TARGET=10.7 && cargo build --verbose --all --features metal; fi
+  - if [[ $JOB == "vulkan" ]]; then export CXX=g++-5 && cargo build --verbose --all --features vulkan; fi
