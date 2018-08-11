@@ -7,15 +7,55 @@ extern crate gfx_backend_vulkan as back;
 extern crate gfx_hal as hal;
 extern crate winit;
 
-use hal::{Instance, QueueFamily};
+use hal::{Capability, Instance, PhysicalDevice, QueueFamily};
 
-static WINDOW_NAME: &str = "03_physical_device_selection";
+static WINDOW_NAME: &str = "05_window_surface";
 
 fn main() {
-    let (_window, events_loop) = init_window();
+    let (window, events_loop) = init_window();
     let instance = init_hal();
-    let _adapter = pick_adapter(&instance);
+    let _surface = create_surface(&instance, &window);
+    let mut adapter = pick_adapter(&instance);
+    let (_device, _command_queues) = create_device_with_graphics_queues(&mut adapter);
     main_loop(events_loop);
+}
+
+fn create_surface(
+    instance: &back::Instance,
+    window: &winit::Window,
+) -> <back::Backend as hal::Backend>::Surface {
+    instance.create_surface(window)
+}
+
+fn create_device_with_graphics_queues(
+    adapter: &mut hal::Adapter<back::Backend>,
+) -> (
+    <back::Backend as hal::Backend>::Device,
+    Vec<hal::queue::CommandQueue<back::Backend, hal::Graphics>>,
+) {
+    let family = adapter
+        .queue_families
+        .iter()
+        .find(|family| hal::Graphics::supported_by(family.queue_type()) && family.max_queues() > 0)
+        .expect("Could not find a queue family supporting graphics.");
+
+    // we only want to create a single queue
+    let priorities = vec![1.0; 1];
+
+    let families = [(family, priorities.as_slice())];
+
+    let hal::Gpu { device, mut queues } = adapter
+        .physical_device
+        .open(&families)
+        .expect("Could not create device.");
+
+    let mut queue_group = queues
+        .take::<hal::Graphics>(family.id())
+        .expect("Could not take ownership of relevant queue group.");
+
+    let command_queues: Vec<_> = queue_group.queues.drain(..1).collect();
+
+    (device, command_queues)
 }
 
 fn find_queue_families(adapter: &hal::Adapter<back::Backend>) -> QueueFamilyIds {

@@ -10,7 +10,7 @@ dx12 = ["gfx-backend-dx12"]
 vulkan = ["gfx-backend-vulkan"]
 
 [dependencies]
-winit = "0.12"
+winit = "0.16"
 gfx-hal = { version = "0.1", git = "https://github.com/gfx-rs/gfx" }
 
 [dependencies.gfx-backend-vulkan]
@@ -43,3 +43,19 @@ path = "src/02_validation_layers.rs"
 [[bin]]
 name = "03_physical_device_selection"
 path = "src/03_physical_device_selection.rs"
+
+[[bin]]
+name = "04_logical_device"
+path = "src/04_logical_device.rs"
+
+[[bin]]
+name = "05_window_surface"
+path = "src/05_window_surface.rs"
+
+[[bin]]
+name = "06_swap_chain_creation"
+path = "src/06_swap_chain_creation.rs"
+
+[[bin]]
+name = "07_image_views"
+path = "src/07_image_views.rs"
