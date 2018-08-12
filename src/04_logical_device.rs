@@ -1,3 +1,4 @@
+extern crate env_logger;
 #[cfg(feature = "dx12")]
 extern crate gfx_backend_dx12 as back;
 #[cfg(feature = "metal")]
@@ -12,11 +13,11 @@ use hal::{Capability, Instance, PhysicalDevice, QueueFamily};
 static WINDOW_NAME: &str = "04_logical_device";
 
 fn main() {
+    env_logger::init();
     let (_window, events_loop) = init_window();
-    let instance = init_hal();
-    let mut adapter = pick_adapter(&instance);
-    let (_device, _command_queues) = create_device_with_graphics_queues(&mut adapter);
+    init_hal();
     main_loop(events_loop);
+    clean_up();
 }
 
 fn create_device_with_graphics_queues(
@@ -100,8 +101,18 @@ fn init_window() -> (winit::Window, winit::EventsLoop) {
     (window, events_loop)
 }
 
-fn init_hal() -> back::Instance {
+fn create_instance() -> back::Instance {
     back::Instance::create(WINDOW_NAME, 1)
+}
+
+fn init_hal() {
+    let instance = create_instance();
+    let mut adapter = pick_adapter(&instance);
+    let (_device, _command_queues) = create_device_with_graphics_queues(&mut adapter);
+}
+
+fn clean_up() {
+    // HAL has implemented automatic destruction of the device
 }
 
 fn main_loop(mut events_loop: winit::EventsLoop) {

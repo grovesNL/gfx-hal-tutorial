@@ -10,22 +10,28 @@ dx12 = ["gfx-backend-dx12"]
 vulkan = ["gfx-backend-vulkan"]
 
 [dependencies]
-winit = "0.16"
-gfx-hal = { version = "0.1", git = "https://github.com/gfx-rs/gfx" }
+winit = "0.17"
+gfx-hal = { version = "0.1", git = "https://github.com/bzm3r/gfx", branch = "all-components" }
+glsl-to-spirv = "0.1.6"
+log = "0.4.0"
+env_logger = "0.5.12"
 
 [dependencies.gfx-backend-vulkan]
 version = "0.1"
-git = "https://github.com/gfx-rs/gfx"
+git = "https://github.com/bzm3r/gfx"
+branch = "all-components"
 optional = true
 
 [target.'cfg(target_os = "macos")'.dependencies.gfx-backend-metal]
 version = "0.1"
-git = "https://github.com/gfx-rs/gfx"
+git = "https://github.com/bzm3r/gfx"
+branch = "all-components"
 optional = true
 
 [target.'cfg(windows)'.dependencies.gfx-backend-dx12]
 version = "0.1"
-git = "https://github.com/gfx-rs/gfx"
+git = "https://github.com/bzm3r/gfx"
+branch = "all-components"
 optional = true
 
 [[bin]]
@@ -59,3 +65,23 @@ path = "src/06_swap_chain_creation.rs"
 [[bin]]
 name = "07_image_views"
 path = "src/07_image_views.rs"
+
+[[bin]]
+name = "08_graphics_pipeline"
+path = "src/08_graphics_pipeline.rs"
+
+[[bin]]
+name = "09_shader_modules"
+path = "src/09_shader_modules.rs"
+
+[[bin]]
+name = "10_fixed_functions"
+path = "src/10_fixed_functions.rs"
+
+[[bin]]
+name = "11_render_passes"
+path = "src/11_render_passes.rs"
+
+[[bin]]
+name = "12_graphics_pipeline_complete"
+path = "src/12_graphics_pipeline_complete.rs"
