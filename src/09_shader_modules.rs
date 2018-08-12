@@ -1,3 +1,5 @@
+#[macro_use]
+extern crate log;
 extern crate env_logger;
 #[cfg(feature = "dx12")]
 extern crate gfx_backend_dx12 as back;
@@ -6,20 +8,70 @@ extern crate gfx_backend_metal as back;
 #[cfg(feature = "vulkan")]
 extern crate gfx_backend_vulkan as back;
 extern crate gfx_hal as hal;
+extern crate glsl_to_spirv;
 extern crate winit;
 
 use hal::{Capability, Device, Instance, PhysicalDevice, QueueFamily, Surface, SwapchainConfig};
+use std::io::Read;
 
-static WINDOW_NAME: &str = "07_image_views";
+static WINDOW_NAME: &str = "09_shader_modules";
 
 fn main() {
     env_logger::init();
+    error!("test!");
     let (window, events_loop) = init_window();
 
     let (_instance, device, swapchain, _surface, frame_images) = init_hal(&window);
     main_loop(events_loop);
 
     clean_up(device, frame_images, swapchain);
+}
+
+fn create_graphics_pipeline(device: &<back::Backend as hal::Backend>::Device) {
+    let vert_shader_code = glsl_to_spirv::compile(
+        include_str!("09_shader_base.vert"),
+        glsl_to_spirv::ShaderType::Vertex,
+    ).expect("Error compiling vertex shader code.")
+    .bytes()
+    .map(|b| b.unwrap())
+    .collect::<Vec<u8>>();
+
+    let frag_shader_code = glsl_to_spirv::compile(
+        include_str!("09_shader_base.frag"),
+        glsl_to_spirv::ShaderType::Fragment,
+    ).expect("Error compiling fragment shader code.")
+    .bytes()
+    .map(|b| b.unwrap())
+    .collect::<Vec<u8>>();
+
+    let vert_shader_module = device
+        .create_shader_module(&vert_shader_code)
+        .expect("Error creating shader module.");
+    let frag_shader_module = device
+        .create_shader_module(&frag_shader_code)
+        .expect("Error creating fragment module.");
+
+    // our goal is to fill out this entire struct
+    //    let desc = hal::pso::GraphicsPipelineDesc {
+    //        shaders,
+    //        rasterizer,
+    //        vertex_buffers,
+    //        attributes,
+    //        input_assembler,
+    //        blender,
+    //        depth_stencil,
+    //        multisampling,
+    //        baked_states,
+    //        layout,
+    //        subpass,
+    //        flags,
+    //        parent,
+    //    };
+
+    device.destroy_shader_module(vert_shader_module);
+    device.destroy_shader_module(frag_shader_module);
+
+    //    device.create_graphics_pipeline(desc, None);
 }
 
 fn create_image_views(
@@ -106,6 +158,7 @@ fn create_device_with_graphics_queues(
                 && surface.supports_queue_family(family)
         }).expect("Could not find a queue family supporting graphics.");
 
+    // we only want to create a single queue
     let priorities = vec![1.0; 1];
 
     let families = [(family, priorities.as_slice())];
@@ -196,8 +249,7 @@ fn init_hal(
     let (device, _command_queues) = create_device_with_graphics_queues(&mut adapter, &surface);
     let (swapchain, backbuffer, format) = create_swap_chain(&adapter, &device, &mut surface, None);
     let frame_images = create_image_views(backbuffer, format, &device);
-
-    // need to return image/image view tuples, as we have to destroy the image views
+    create_graphics_pipeline(&device);
     (instance, device, swapchain, surface, frame_images)
 }
 

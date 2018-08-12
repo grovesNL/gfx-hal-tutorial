@@ -1,3 +1,4 @@
+extern crate env_logger;
 #[cfg(feature = "dx12")]
 extern crate gfx_backend_dx12 as back;
 #[cfg(feature = "metal")]
@@ -12,26 +13,23 @@ use hal::{Capability, Device, Instance, PhysicalDevice, QueueFamily, Surface, Sw
 static WINDOW_NAME: &str = "06_swap_chain_creation";
 
 fn main() {
+    env_logger::init();
     let (window, events_loop) = init_window();
-    let instance = init_hal();
-    let mut surface = create_surface(&instance, &window);
-    let mut adapter = pick_adapter(&instance);
-    let (device, _command_queues) = create_device_with_graphics_queues(&mut adapter);
-    let (_swapchain, _backbuffer, _extent, _format) =
-        create_swap_chain(&adapter, &device, &mut surface, &window, None);
+    // we must return surface, since it must be destroyed before swapchain
+    let (_instance, device, swapchain, _surface) = init_hal(&window);
     main_loop(events_loop);
+    // must destroy the swapchain
+    clean_up(device, swapchain);
 }
 
 fn create_swap_chain(
     adapter: &hal::Adapter<back::Backend>,
     device: &<back::Backend as hal::Backend>::Device,
     surface: &mut <back::Backend as hal::Backend>::Surface,
-    window: &winit::Window,
     previous_swapchain: Option<<back::Backend as hal::Backend>::Swapchain>,
 ) -> (
     <back::Backend as hal::Backend>::Swapchain,
     hal::Backbuffer<back::Backend>,
-    hal::window::Extent2D,
     hal::format::Format,
 ) {
     let (caps, formats, _present_modes) = surface.compatibility(&adapter.physical_device);
@@ -44,30 +42,11 @@ fn create_swap_chain(
             .unwrap_or(formats[0])
     });
 
-    let extent = caps.current_extent.unwrap_or_else(|| {
-        let window_size: (u32, u32) = window
-            .get_inner_size()
-            .unwrap()
-            .to_physical(window.get_hidpi_factor())
-            .into();
+    let swap_config = SwapchainConfig::from_caps(&caps, format);
 
-        let std::ops::Range { start, end } = caps.extents;
+    let (swapchain, backbuffer) = device.create_swapchain(surface, swap_config, previous_swapchain);
 
-        hal::window::Extent2D {
-            width: window_size.0.max(start.width).min(end.width),
-            height: window_size.1.max(start.height).min(end.height),
-        }
-    });
-
-    let swap_config = SwapchainConfig::new()
-        .with_color(format)
-        .with_image_count(caps.image_count.start)
-        .with_image_usage(hal::image::Usage::COLOR_ATTACHMENT);
-
-    let (swapchain, backbuffer) =
-        device.create_swapchain(surface, swap_config, previous_swapchain, &extent);
-
-    (swapchain, backbuffer, extent, format)
+    (swapchain, backbuffer, format)
 }
 
 fn create_surface(
@@ -79,6 +58,7 @@ fn create_surface(
 
 fn create_device_with_graphics_queues(
     adapter: &mut hal::Adapter<back::Backend>,
+    surface: &<back::Backend as hal::Backend>::Surface,
 ) -> (
     <back::Backend as hal::Backend>::Device,
     Vec<hal::queue::CommandQueue<back::Backend, hal::Graphics>>,
@@ -86,10 +66,12 @@ fn create_device_with_graphics_queues(
     let family = adapter
         .queue_families
         .iter()
-        .find(|family| hal::Graphics::supported_by(family.queue_type()) && family.max_queues() > 0)
-        .expect("Could not find a queue family supporting graphics.");
+        .find(|family| {
+            hal::Graphics::supported_by(family.queue_type())
+                && family.max_queues() > 0
+                && surface.supports_queue_family(family)
+        }).expect("Could not find a queue family supporting graphics.");
 
-    // we only want to create a single queue
     let priorities = vec![1.0; 1];
 
     let families = [(family, priorities.as_slice())];
@@ -158,8 +140,33 @@ fn init_window() -> (winit::Window, winit::EventsLoop) {
     (window, events_loop)
 }
 
-fn init_hal() -> back::Instance {
+fn create_instance() -> back::Instance {
     back::Instance::create(WINDOW_NAME, 1)
+}
+
+fn init_hal(
+    window: &winit::Window,
+) -> (
+    back::Instance,
+    <back::Backend as hal::Backend>::Device,
+    <back::Backend as hal::Backend>::Swapchain,
+    <back::Backend as hal::Backend>::Surface,
+) {
+    let instance = create_instance();
+    let mut surface = create_surface(&instance, window);
+    let mut adapter = pick_adapter(&instance);
+    let (device, _command_queues) = create_device_with_graphics_queues(&mut adapter, &surface);
+    let (swapchain, _backbuffer, _format) =
+        create_swap_chain(&adapter, &device, &mut surface, None);
+
+    (instance, device, swapchain, surface)
+}
+
+fn clean_up(
+    device: <back::Backend as hal::Backend>::Device,
+    swapchain: <back::Backend as hal::Backend>::Swapchain,
+) {
+    device.destroy_swapchain(swapchain);
 }
 
 fn main_loop(mut events_loop: winit::EventsLoop) {

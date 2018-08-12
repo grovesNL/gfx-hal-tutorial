@@ -1,3 +1,4 @@
+extern crate env_logger;
 #[cfg(feature = "dx12")]
 extern crate gfx_backend_dx12 as back;
 #[cfg(feature = "metal")]
@@ -10,9 +11,15 @@ extern crate winit;
 static WINDOW_NAME: &str = "02_validation_layers";
 
 fn main() {
+    // run the program like so to print all logs of level 'warn' and above:
+    // bash: RUST_LOG=warn && cargo run --bin 02_validation_layers --features vulkan
+    // powershell: $env:RUST_LOG="warn"; cargo run --bin 02_validation_layers --features vulkan
+    // see: https://docs.rs/env_logger/0.5.13/env_logger/
+    env_logger::init();
     let (_window, events_loop) = init_window();
-    let _instance = init_hal();
+    init_hal();
     main_loop(events_loop);
+    clean_up();
 }
 
 fn init_window() -> (winit::Window, winit::EventsLoop) {
@@ -24,13 +31,14 @@ fn init_window() -> (winit::Window, winit::EventsLoop) {
     (window, events_loop)
 }
 
-fn init_hal() -> back::Instance {
-    // if using Vulkan, HAL loads `VK_LAYER_LUNARG_standard_validation` during instance creation
-    // user can specify additional layers by setting environment variables
-    // some backends may not have Vulkan-esque validation layers!
-    // end result: nothing changes in terms of code
+fn create_instance() -> back::Instance {
     back::Instance::create(WINDOW_NAME, 1)
 }
+fn init_hal() {
+    let _instance = create_instance();
+}
+
+fn clean_up() {}
 
 fn main_loop(mut events_loop: winit::EventsLoop) {
     events_loop.run_forever(|event| match event {

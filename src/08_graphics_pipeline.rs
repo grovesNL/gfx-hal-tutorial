@@ -10,7 +10,7 @@ extern crate winit;
 
 use hal::{Capability, Device, Instance, PhysicalDevice, QueueFamily, Surface, SwapchainConfig};
 
-static WINDOW_NAME: &str = "07_image_views";
+static WINDOW_NAME: &str = "08_graphics_pipeline";
 
 fn main() {
     env_logger::init();
@@ -20,6 +20,27 @@ fn main() {
     main_loop(events_loop);
 
     clean_up(device, frame_images, swapchain);
+}
+
+fn create_graphics_pipeline() {
+    // our goal is to fill out this entire struct
+    //    let desc = hal::pso::GraphicsPipelineDesc {
+    //        shaders,
+    //        rasterizer,
+    //        vertex_buffers,
+    //        attributes,
+    //        input_assembler,
+    //        blender,
+    //        depth_stencil,
+    //        multisampling,
+    //        baked_states,
+    //        layout,
+    //        subpass,
+    //        flags,
+    //        parent,
+    //    };
+
+    //    device.create_graphics_pipeline(desc, None);
 }
 
 fn create_image_views(
@@ -51,7 +72,6 @@ fn create_image_views(
 
                 (image, image_view)
             }).collect(),
-        // OpenGL case, where backbuffer is a framebuffer, not implemented currently
         _ => unimplemented!(),
     }
 }
@@ -196,8 +216,7 @@ fn init_hal(
     let (device, _command_queues) = create_device_with_graphics_queues(&mut adapter, &surface);
     let (swapchain, backbuffer, format) = create_swap_chain(&adapter, &device, &mut surface, None);
     let frame_images = create_image_views(backbuffer, format, &device);
-
-    // need to return image/image view tuples, as we have to destroy the image views
+    create_graphics_pipeline();
     (instance, device, swapchain, surface, frame_images)
 }
 

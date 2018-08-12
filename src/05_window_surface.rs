@@ -1,3 +1,4 @@
+extern crate env_logger;
 #[cfg(feature = "dx12")]
 extern crate gfx_backend_dx12 as back;
 #[cfg(feature = "metal")]
@@ -7,17 +8,16 @@ extern crate gfx_backend_vulkan as back;
 extern crate gfx_hal as hal;
 extern crate winit;
 
-use hal::{Capability, Instance, PhysicalDevice, QueueFamily};
+use hal::{Capability, Instance, PhysicalDevice, QueueFamily, Surface};
 
 static WINDOW_NAME: &str = "05_window_surface";
 
 fn main() {
+    env_logger::init();
     let (window, events_loop) = init_window();
-    let instance = init_hal();
-    let _surface = create_surface(&instance, &window);
-    let mut adapter = pick_adapter(&instance);
-    let (_device, _command_queues) = create_device_with_graphics_queues(&mut adapter);
+    init_hal(&window);
     main_loop(events_loop);
+    clean_up();
 }
 
 fn create_surface(
@@ -27,8 +27,10 @@ fn create_surface(
     instance.create_surface(window)
 }
 
+// we have an additional check to make: make sure the queue family selected supports presentation to the surface we have created
 fn create_device_with_graphics_queues(
     adapter: &mut hal::Adapter<back::Backend>,
+    surface: &<back::Backend as hal::Backend>::Surface,
 ) -> (
     <back::Backend as hal::Backend>::Device,
     Vec<hal::queue::CommandQueue<back::Backend, hal::Graphics>>,
@@ -36,8 +38,11 @@ fn create_device_with_graphics_queues(
     let family = adapter
         .queue_families
         .iter()
-        .find(|family| hal::Graphics::supported_by(family.queue_type()) && family.max_queues() > 0)
-        .expect("Could not find a queue family supporting graphics.");
+        .find(|family| {
+            hal::Graphics::supported_by(family.queue_type())
+                && family.max_queues() > 0
+                && surface.supports_queue_family(family)
+        }).expect("Could not find a queue family supporting graphics.");
 
     // we only want to create a single queue
     let priorities = vec![1.0; 1];
@@ -108,8 +113,19 @@ fn init_window() -> (winit::Window, winit::EventsLoop) {
     (window, events_loop)
 }
 
-fn init_hal() -> back::Instance {
+fn create_instance() -> back::Instance {
     back::Instance::create(WINDOW_NAME, 1)
+}
+
+fn init_hal(window: &winit::Window) {
+    let instance = create_instance();
+    let surface = create_surface(&instance, window);
+    let mut adapter = pick_adapter(&instance);
+    let (_device, _command_queues) = create_device_with_graphics_queues(&mut adapter, &surface);
+}
+
+fn clean_up() {
+    // HAL has implemented automatic destruction of the surface
 }
 
 fn main_loop(mut events_loop: winit::EventsLoop) {

@@ -11,8 +11,9 @@ static WINDOW_NAME: &str = "01_instance_creation";
 
 fn main() {
     let (_window, events_loop) = init_window();
-    let _instance = init_hal();
+    init_hal();
     main_loop(events_loop);
+    clean_up();
 }
 
 fn init_window() -> (winit::Window, winit::EventsLoop) {
@@ -24,8 +25,16 @@ fn init_window() -> (winit::Window, winit::EventsLoop) {
     (window, events_loop)
 }
 
-fn init_hal() -> back::Instance {
+fn create_instance() -> back::Instance {
     back::Instance::create(WINDOW_NAME, 1)
+}
+
+fn init_hal() {
+    let _instance = create_instance();
+}
+
+fn clean_up() {
+    // HAL has implemented automatic destruction of instance
 }
 
 fn main_loop(mut events_loop: winit::EventsLoop) {
