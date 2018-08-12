@@ -41,7 +41,7 @@ fn main() {
 
 fn create_graphics_pipeline(
     device: &<back::Backend as hal::Backend>::Device,
-    extent: &hal::window::Extent2D,
+    extent: hal::window::Extent2D,
 ) -> (
     Vec<<back::Backend as hal::Backend>::DescriptorSetLayout>,
     <back::Backend as hal::Backend>::PipelineLayout,
@@ -370,7 +370,7 @@ fn init_hal(
     let (swapchain, extent, backbuffer, format) =
         create_swap_chain(&adapter, &device, &mut surface, None);
     let frame_images = create_image_views(backbuffer, format, &device);
-    let (descriptor_set_layouts, pipeline_layout) = create_graphics_pipeline(&device, &extent);
+    let (descriptor_set_layouts, pipeline_layout) = create_graphics_pipeline(&device, extent);
     (
         instance,
         device,

@@ -9,10 +9,14 @@ extern crate gfx_hal as hal;
 extern crate glsl_to_spirv;
 extern crate winit;
 
-use hal::{Capability, Device, Instance, PhysicalDevice, QueueFamily, Surface, SwapchainConfig};
+use hal::{
+    Capability, Device, Instance, PhysicalDevice, QueueFamily, Surface, Swapchain, SwapchainConfig,
+};
 use std::io::Read;
 
-static WINDOW_NAME: &str = "12_gfx_pipeline_complete";
+static WINDOW_NAME: &str = "15_command_buffers";
+
+const MAX_FRAMES_IN_FLIGHT: usize = 2;
 
 fn main() {
     env_logger::init();
@@ -21,15 +25,32 @@ fn main() {
     let (
         _instance,
         device,
-        swapchain,
+        mut command_queues,
+        mut swapchain,
         _surface,
         frame_images,
         render_pass,
         descriptor_set_layouts,
         pipeline_layout,
         gfx_pipeline,
+        swapchain_framebuffers,
+        command_pool,
+        submission_command_buffers,
+        image_available_semaphores,
+        render_finished_semaphores,
+        in_flight_fences,
     ) = init_hal(&window);
-    main_loop(events_loop);
+
+    main_loop(
+        &device,
+        events_loop,
+        &mut command_queues,
+        &mut swapchain,
+        &submission_command_buffers,
+        &image_available_semaphores,
+        &render_finished_semaphores,
+        &in_flight_fences,
+    );
 
     clean_up(
         device,
@@ -39,7 +60,156 @@ fn main() {
         descriptor_set_layouts,
         pipeline_layout,
         gfx_pipeline,
+        swapchain_framebuffers,
+        command_pool,
+        vec![image_available_semaphores, render_finished_semaphores],
+        in_flight_fences,
     );
+}
+
+fn draw_frame(
+    device: &<back::Backend as hal::Backend>::Device,
+    command_queues: &mut Vec<hal::queue::CommandQueue<back::Backend, hal::Graphics>>,
+    swapchain: &mut <back::Backend as hal::Backend>::Swapchain,
+    submission_command_buffers: &Vec<
+        hal::command::Submit<
+            back::Backend,
+            hal::Graphics,
+            hal::command::MultiShot,
+            hal::command::Primary,
+        >,
+    >,
+    image_available_semaphore: &<back::Backend as hal::Backend>::Semaphore,
+    render_finished_semaphore: &<back::Backend as hal::Backend>::Semaphore,
+    in_flight_fence: &<back::Backend as hal::Backend>::Fence,
+) {
+    device.wait_for_fence(in_flight_fence, std::u64::MAX);
+    device.reset_fence(in_flight_fence);
+
+    let image_index = swapchain
+        .acquire_image(
+            std::u64::MAX,
+            hal::window::FrameSync::Semaphore(image_available_semaphore),
+        ).expect("could not acquire image!");
+
+    let submission = hal::queue::submission::Submission::new()
+        .wait_on(&[(
+            image_available_semaphore,
+            hal::pso::PipelineStage::COLOR_ATTACHMENT_OUTPUT,
+        )]).signal(vec![render_finished_semaphore])
+        .submit(Some(&submission_command_buffers[image_index as usize]));
+
+    // recall we only made one queue
+    command_queues[0].submit(submission, Some(in_flight_fence));
+
+    swapchain
+        .present(
+            &mut command_queues[0],
+            image_index,
+            vec![render_finished_semaphore],
+        ).expect("presentation failed!");
+}
+
+fn create_command_buffers<'a>(
+    command_pool: &'a mut hal::pool::CommandPool<back::Backend, hal::Graphics>,
+    render_pass: &<back::Backend as hal::Backend>::RenderPass,
+    framebuffers: &Vec<<back::Backend as hal::Backend>::Framebuffer>,
+    extent: hal::window::Extent2D,
+    pipeline: &<back::Backend as hal::Backend>::GraphicsPipeline,
+) -> Vec<
+    hal::command::Submit<
+        back::Backend,
+        hal::Graphics,
+        hal::command::MultiShot,
+        hal::command::Primary,
+    >,
+> {
+    command_pool.reserve(framebuffers.iter().count());
+
+    let mut submission_command_buffers: Vec<
+        hal::command::Submit<
+            back::Backend,
+            hal::Graphics,
+            hal::command::MultiShot,
+            hal::command::Primary,
+        >,
+    > = Vec::new();
+
+    for fb in framebuffers.iter() {
+        let mut command_buffer: hal::command::CommandBuffer<
+            back::Backend,
+            hal::Graphics,
+            hal::command::MultiShot,
+            hal::command::Primary,
+        > = command_pool.acquire_command_buffer(true);
+
+        command_buffer.bind_graphics_pipeline(pipeline);
+        {
+            let render_area = hal::pso::Rect {
+                x: 0,
+                y: 0,
+                w: extent.width as _,
+                h: extent.height as _,
+            };
+            let clear_values = vec![hal::command::ClearValue::Color(
+                hal::command::ClearColor::Float([0.0, 0.0, 0.0, 4.0]),
+            )];
+
+            let mut render_pass_inline_encoder = command_buffer.begin_render_pass_inline(
+                render_pass,
+                fb,
+                render_area,
+                clear_values.iter(),
+            );
+            render_pass_inline_encoder.draw(0..3, 0..1);
+        }
+
+        let submission_command_buffer = command_buffer.finish();
+        submission_command_buffers.push(submission_command_buffer);
+    }
+
+    submission_command_buffers
+}
+
+fn create_command_pool(
+    device: &<back::Backend as hal::Backend>::Device,
+    queue_type: hal::queue::QueueType,
+    qf_id: hal::queue::family::QueueFamilyId,
+) -> hal::pool::CommandPool<back::Backend, hal::Graphics> {
+    let raw_command_pool =
+        device.create_command_pool(qf_id, hal::pool::CommandPoolCreateFlags::empty());
+
+    assert_eq!(hal::Graphics::supported_by(queue_type), true);
+    unsafe { hal::pool::CommandPool::new(raw_command_pool) }
+}
+
+fn create_framebuffers(
+    device: &<back::Backend as hal::Backend>::Device,
+    render_pass: &<back::Backend as hal::Backend>::RenderPass,
+    frame_images: &Vec<(
+        <back::Backend as hal::Backend>::Image,
+        <back::Backend as hal::Backend>::ImageView,
+    )>,
+    extent: hal::window::Extent2D,
+) -> Vec<<back::Backend as hal::Backend>::Framebuffer> {
+    let mut swapchain_framebuffers: Vec<<back::Backend as hal::Backend>::Framebuffer> = Vec::new();
+
+    for (_, image_view) in frame_images.iter() {
+        swapchain_framebuffers.push(
+            device
+                .create_framebuffer(
+                    render_pass,
+                    vec![image_view],
+                    hal::image::Extent {
+                        width: extent.width as _,
+                        height: extent.height as _,
+                        depth: 1,
+                    },
+                ).expect("failed to create framebuffer!"),
+        );
+    }
+
+    swapchain_framebuffers
 }
 
 fn create_render_pass(
@@ -76,7 +246,20 @@ fn create_render_pass(
         preserves: &[],
     };
 
-    device.create_render_pass(&[color_attachment], &[subpass], &[])
+    // describing subpass dependencies
+    let subpass_dependency = hal::pass::SubpassDependency {
+        // srcSubpass .. dstSubpass
+        passes: hal::pass::SubpassRef::External..hal::pass::SubpassRef::Pass(0),
+        // srcStageMask .. dstStageMask
+        stages: hal::pso::PipelineStage::COLOR_ATTACHMENT_OUTPUT
+            ..hal::pso::PipelineStage::COLOR_ATTACHMENT_OUTPUT,
+        // srcAccessMask .. dstAccessMask
+        accesses: hal::image::Access::empty()
+            ..hal::image::Access::COLOR_ATTACHMENT_READ
+            | hal::image::Access::COLOR_ATTACHMENT_WRITE,
+    };
+
+    device.create_render_pass(&[color_attachment], &[subpass], &[subpass_dependency])
 }
 
 fn create_graphics_pipeline(
@@ -92,17 +275,17 @@ fn create_graphics_pipeline(
         include_str!("09_shader_base.vert"),
         glsl_to_spirv::ShaderType::Vertex,
     ).expect("Error compiling vertex shader code.")
-    .bytes()
-    .map(|b| b.unwrap())
-    .collect::<Vec<u8>>();
+        .bytes()
+        .map(|b| b.unwrap())
+        .collect::<Vec<u8>>();
 
     let frag_shader_code = glsl_to_spirv::compile(
         include_str!("09_shader_base.frag"),
         glsl_to_spirv::ShaderType::Fragment,
     ).expect("Error compiling fragment shader code.")
-    .bytes()
-    .map(|b| b.unwrap())
-    .collect::<Vec<u8>>();
+        .bytes()
+        .map(|b| b.unwrap())
+        .collect::<Vec<u8>>();
 
     let vert_shader_module = device
         .create_shader_module(&vert_shader_code)
@@ -317,6 +500,8 @@ fn create_device_with_graphics_queues(
 ) -> (
     <back::Backend as hal::Backend>::Device,
     Vec<hal::queue::CommandQueue<back::Backend, hal::Graphics>>,
+    hal::queue::QueueType,
+    hal::queue::family::QueueFamilyId,
 ) {
     let family = adapter
         .queue_families
@@ -342,7 +527,33 @@ fn create_device_with_graphics_queues(
 
     let command_queues: Vec<_> = queue_group.queues.drain(..1).collect();
 
-    (device, command_queues)
+    (device, command_queues, family.queue_type(), family.id())
+}
+
+fn create_sync_objects(
+    device: &<back::Backend as hal::Backend>::Device,
+) -> (
+    Vec<<back::Backend as hal::Backend>::Semaphore>,
+    Vec<<back::Backend as hal::Backend>::Semaphore>,
+    Vec<<back::Backend as hal::Backend>::Fence>,
+) {
+    let mut image_available_semaphores: Vec<<back::Backend as hal::Backend>::Semaphore> =
+        Vec::new();
+    let mut render_finished_semaphores: Vec<<back::Backend as hal::Backend>::Semaphore> =
+        Vec::new();
+    let mut in_flight_fences: Vec<<back::Backend as hal::Backend>::Fence> = Vec::new();
+
+    for _ in 0..MAX_FRAMES_IN_FLIGHT {
+        image_available_semaphores.push(device.create_semaphore());
+        render_finished_semaphores.push(device.create_semaphore());
+        in_flight_fences.push(device.create_fence(true));
+    }
+
+    (
+        image_available_semaphores,
+        render_finished_semaphores,
+        in_flight_fences,
+    )
 }
 
 fn find_queue_families(adapter: &hal::Adapter<back::Backend>) -> QueueFamilyIds {
@@ -404,6 +615,7 @@ fn init_hal(
 ) -> (
     back::Instance,
     <back::Backend as hal::Backend>::Device,
+    Vec<hal::queue::CommandQueue<back::Backend, hal::Graphics>>,
     <back::Backend as hal::Backend>::Swapchain,
     <back::Backend as hal::Backend>::Surface,
     Vec<(
@@ -414,20 +626,46 @@ fn init_hal(
     Vec<<back::Backend as hal::Backend>::DescriptorSetLayout>,
     <back::Backend as hal::Backend>::PipelineLayout,
     <back::Backend as hal::Backend>::GraphicsPipeline,
+    Vec<<back::Backend as hal::Backend>::Framebuffer>,
+    hal::pool::CommandPool<back::Backend, hal::Graphics>,
+    Vec<
+        hal::command::Submit<
+            back::Backend,
+            hal::Graphics,
+            hal::command::MultiShot,
+            hal::command::Primary,
+        >,
+    >,
+    Vec<<back::Backend as hal::Backend>::Semaphore>,
+    Vec<<back::Backend as hal::Backend>::Semaphore>,
+    Vec<<back::Backend as hal::Backend>::Fence>,
 ) {
     let instance = create_instance();
     let mut surface = create_surface(&instance, window);
     let mut adapter = pick_adapter(&instance);
-    let (device, _command_queues) = create_device_with_graphics_queues(&mut adapter, &surface);
+    let (device, command_queues, queue_type, qf_id) =
+        create_device_with_graphics_queues(&mut adapter, &surface);
     let (swapchain, extent, backbuffer, format) =
         create_swap_chain(&adapter, &device, &mut surface, None);
     let frame_images = create_image_views(backbuffer, format, &device);
     let render_pass = create_render_pass(&device, Some(format));
+    let swapchain_framebuffers = create_framebuffers(&device, &render_pass, &frame_images, extent);
     let (descriptor_set_layouts, pipeline_layout, gfx_pipeline) =
         create_graphics_pipeline(&device, extent, &render_pass);
+    let mut command_pool = create_command_pool(&device, queue_type, qf_id);
+    let submission_command_buffers = create_command_buffers(
+        &mut command_pool,
+        &render_pass,
+        &swapchain_framebuffers,
+        extent,
+        &gfx_pipeline,
+    );
+    let (image_available_semaphores, render_finished_semaphores, in_flight_fences) =
+        create_sync_objects(&device);
     (
         instance,
         device,
+        command_queues,
         swapchain,
         surface,
         frame_images,
@@ -435,6 +673,12 @@ fn init_hal(
         descriptor_set_layouts,
         pipeline_layout,
         gfx_pipeline,
+        swapchain_framebuffers,
+        command_pool,
+        submission_command_buffers,
+        image_available_semaphores,
+        render_finished_semaphores,
+        in_flight_fences,
     )
 }
 
@@ -449,7 +693,27 @@ fn clean_up(
     descriptor_set_layouts: Vec<<back::Backend as hal::Backend>::DescriptorSetLayout>,
     pipeline_layout: <back::Backend as hal::Backend>::PipelineLayout,
     gfx_pipeline: <back::Backend as hal::Backend>::GraphicsPipeline,
+    swapchain_framebuffers: Vec<<back::Backend as hal::Backend>::Framebuffer>,
+    command_pool: hal::pool::CommandPool<back::Backend, hal::Graphics>,
+    semaphores_per_case: Vec<Vec<<back::Backend as hal::Backend>::Semaphore>>,
+    in_flight_fences: Vec<<back::Backend as hal::Backend>::Fence>,
 ) {
+    for fence in in_flight_fences.into_iter() {
+        device.destroy_fence(fence);
+    }
+
+    for semaphores_per_frame in semaphores_per_case.into_iter() {
+        for semaphore in semaphores_per_frame.into_iter() {
+            device.destroy_semaphore(semaphore);
+        }
+    }
+
+    device.destroy_command_pool(command_pool.into_raw());
+
+    for fb in swapchain_framebuffers.into_iter() {
+        device.destroy_framebuffer(fb);
+    }
+
     device.destroy_graphics_pipeline(gfx_pipeline);
 
     for dsl in descriptor_set_layouts.into_iter() {
@@ -467,12 +731,45 @@ fn clean_up(
     device.destroy_swapchain(swapchain);
 }
 
-fn main_loop(mut events_loop: winit::EventsLoop) {
+fn main_loop(
+    device: &<back::Backend as hal::Backend>::Device,
+    mut events_loop: winit::EventsLoop,
+    command_queues: &mut Vec<hal::queue::CommandQueue<back::Backend, hal::Graphics>>,
+    swapchain: &mut <back::Backend as hal::Backend>::Swapchain,
+    submission_command_buffers: &Vec<
+        hal::command::Submit<
+            back::Backend,
+            hal::Graphics,
+            hal::command::MultiShot,
+            hal::command::Primary,
+        >,
+    >,
+    image_available_semaphores: &Vec<<back::Backend as hal::Backend>::Semaphore>,
+    render_finished_semaphores: &Vec<<back::Backend as hal::Backend>::Semaphore>,
+    in_flight_fences: &Vec<<back::Backend as hal::Backend>::Fence>,
+) {
+    let mut current_frame: usize = 0;
+
     events_loop.run_forever(|event| match event {
         winit::Event::WindowEvent {
             event: winit::WindowEvent::CloseRequested,
             ..
-        } => winit::ControlFlow::Break,
-        _ => winit::ControlFlow::Continue,
+        } => {
+            device.wait_idle().expect("Queues are not going idle!");
+            winit::ControlFlow::Break
+        }
+        _ => {
+            draw_frame(
+                device,
+                command_queues,
+                swapchain,
+                submission_command_buffers,
+                &image_available_semaphores[current_frame],
+                &render_finished_semaphores[current_frame],
+                &in_flight_fences[current_frame],
+            );
+            current_frame = (current_frame + 1) % MAX_FRAMES_IN_FLIGHT;;
+            winit::ControlFlow::Continue
+        }
     });
 }
