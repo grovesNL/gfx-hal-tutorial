@@ -16,11 +16,13 @@ matrix:
       osx_image: xcode9
       compiler: clang
       env:
-        - JOB="metal"
+        - JOB=metal
+        - MACOSX_DEPLOYMENT_TARGET=10.9
     - os: linux
       compiler: gcc
       env:
-        - JOB="vulkan"
+        - JOB=vulkan
+        - CXX=g++-5
       addons:
         apt:
           sources:
@@ -36,5 +38,5 @@ notifications:
     on_failure: always
     on_start: never
 script:
-  - if [[ $JOB == "metal" ]]; then export CXX=clang++ && export MACOSX_DEPLOYMENT_TARGET=10.7 && cargo build --verbose --all --features metal; fi
-  - if [[ $JOB == "vulkan" ]]; then export CXX=g++-5 && cargo build --verbose --all --features vulkan; fi
+  - if [[ $JOB == "metal" ]]; then cargo build --verbose --all --features metal; fi
+  - if [[ $JOB == "vulkan" ]]; then cargo build --verbose --all --features vulkan; fi
