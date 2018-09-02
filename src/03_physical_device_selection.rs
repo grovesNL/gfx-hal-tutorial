@@ -1,3 +1,4 @@
+extern crate env_logger;
 #[cfg(feature = "dx12")]
 extern crate gfx_backend_dx12 as back;
 #[cfg(feature = "metal")]
@@ -12,10 +13,11 @@ use hal::{Instance, QueueFamily};
 static WINDOW_NAME: &str = "03_physical_device_selection";
 
 fn main() {
+    env_logger::init();
     let (_window, events_loop) = init_window();
-    let instance = init_hal();
-    let _adapter = pick_adapter(&instance);
+    init_hal();
     main_loop(events_loop);
+    clean_up();
 }
 
 fn find_queue_families(adapter: &hal::Adapter<back::Backend>) -> QueueFamilyIds {
@@ -68,9 +70,16 @@ fn init_window() -> (winit::Window, winit::EventsLoop) {
     (window, events_loop)
 }
 
-fn init_hal() -> back::Instance {
+fn create_instance() -> back::Instance {
     back::Instance::create(WINDOW_NAME, 1)
 }
+
+fn init_hal() {
+    let instance = create_instance();
+    let _adapter = pick_adapter(&instance);
+}
+
+fn clean_up() {}
 
 fn main_loop(mut events_loop: winit::EventsLoop) {
     events_loop.run_forever(|event| match event {
