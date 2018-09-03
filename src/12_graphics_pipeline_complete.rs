@@ -6,8 +6,8 @@ extern crate gfx_backend_metal as back;
 #[cfg(feature = "vulkan")]
 extern crate gfx_backend_vulkan as back;
 extern crate gfx_hal as hal;
-extern crate winit;
 extern crate glsl_to_spirv;
+extern crate winit;
 
 use hal::{Capability, Device, Instance, PhysicalDevice, QueueFamily, Surface, SwapchainConfig};
 use std::io::Read;
@@ -81,26 +81,28 @@ fn create_render_pass(
 
 fn create_graphics_pipeline(
     device: &<back::Backend as hal::Backend>::Device,
-    extent: &hal::window::Extent2D,
+    extent: hal::window::Extent2D,
     render_pass: &<back::Backend as hal::Backend>::RenderPass,
 ) -> (
     Vec<<back::Backend as hal::Backend>::DescriptorSetLayout>,
     <back::Backend as hal::Backend>::PipelineLayout,
     <back::Backend as hal::Backend>::GraphicsPipeline,
 ) {
-    let vert_shader_code =
-        glsl_to_spirv::compile(include_str!("09_shader_base.vert"), glsl_to_spirv::ShaderType::Vertex)
-            .expect("Error compiling vertex shader code.")
-            .bytes()
-            .map(|b| b.unwrap())
-            .collect::<Vec<u8>>();
+    let vert_shader_code = glsl_to_spirv::compile(
+        include_str!("09_shader_base.vert"),
+        glsl_to_spirv::ShaderType::Vertex,
+    ).expect("Error compiling vertex shader code.")
+    .bytes()
+    .map(|b| b.unwrap())
+    .collect::<Vec<u8>>();
 
-    let frag_shader_code =
-        glsl_to_spirv::compile(include_str!("09_shader_base.frag"), glsl_to_spirv::ShaderType::Fragment)
-            .expect("Error compiling fragment shader code.")
-            .bytes()
-            .map(|b| b.unwrap())
-            .collect::<Vec<u8>>();
+    let frag_shader_code = glsl_to_spirv::compile(
+        include_str!("09_shader_base.frag"),
+        glsl_to_spirv::ShaderType::Fragment,
+    ).expect("Error compiling fragment shader code.")
+    .bytes()
+    .map(|b| b.unwrap())
+    .collect::<Vec<u8>>();
 
     let vert_shader_module = device
         .create_shader_module(&vert_shader_code)
@@ -422,7 +424,7 @@ fn init_hal(
     let frame_images = create_image_views(backbuffer, format, &device);
     let render_pass = create_render_pass(&device, Some(format));
     let (descriptor_set_layouts, pipeline_layout, gfx_pipeline) =
-        create_graphics_pipeline(&device, &extent, &render_pass);
+        create_graphics_pipeline(&device, extent, &render_pass);
     (
         instance,
         device,

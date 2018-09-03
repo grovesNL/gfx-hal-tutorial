@@ -6,8 +6,8 @@ extern crate gfx_backend_metal as back;
 #[cfg(feature = "vulkan")]
 extern crate gfx_backend_vulkan as back;
 extern crate gfx_hal as hal;
-extern crate winit;
 extern crate glsl_to_spirv;
+extern crate winit;
 
 use hal::{Capability, Device, Instance, PhysicalDevice, QueueFamily, Surface, SwapchainConfig};
 use std::io::Read;
@@ -46,28 +46,39 @@ fn main() {
     );
 }
 
-fn create_command_pool(device: &<back::Backend as hal::Backend>::Device, queue_type: hal::queue::QueueType, qf_id: hal::queue::family::QueueFamilyId,)
-    -> hal::pool::CommandPool<back::Backend, hal::Graphics> {
+fn create_command_pool(
+    device: &<back::Backend as hal::Backend>::Device,
+    queue_type: hal::queue::QueueType,
+    qf_id: hal::queue::family::QueueFamilyId,
+) -> hal::pool::CommandPool<back::Backend, hal::Graphics> {
     // raw command pool: a thin wrapper around command pools
     // strongly typed command pool: a safe wrapper around command pools, which ensures that only one command buffer is recorded at the same time from the current queue
-    let raw_command_pool = device.create_command_pool(qf_id, hal::pool::CommandPoolCreateFlags::empty());
+    let raw_command_pool =
+        device.create_command_pool(qf_id, hal::pool::CommandPoolCreateFlags::empty());
 
     // safety check necessary before creating a strongly typed command pool
     assert_eq!(hal::Graphics::supported_by(queue_type), true);
-    unsafe {
-        hal::pool::CommandPool::new(raw_command_pool)
-    }
+    unsafe { hal::pool::CommandPool::new(raw_command_pool) }
 }
 
-fn create_command_buffers(command_pool: &mut hal::pool::CommandPool<back::Backend, hal::Graphics>, render_pass: &<back::Backend as hal::Backend>::RenderPass, framebuffers: Vec<<back::Backend as hal::Backend>::Framebuffer>, extent: &hal::window::Extent2D, pipeline: &<back::Backend as hal::Backend>::GraphicsPipeline) -> Vec<hal::command::CommandBuffer<back::Backend, hal::Graphics>> {
+fn create_command_buffers<'a>(
+    command_pool: &'a mut hal::pool::CommandPool<back::Backend, hal::Graphics>,
+    render_pass: &<back::Backend as hal::Backend>::RenderPass,
+    framebuffers: &Vec<<back::Backend as hal::Backend>::Framebuffer>,
+    extent: hal::window::Extent2D,
+    pipeline: &<back::Backend as hal::Backend>::GraphicsPipeline,
+) -> Vec<hal::command::Submit<back::Backend, hal::Graphics, hal::command::MultiShot, hal::command::Primary>> {
     // reserve (allocate memory for) num number of primary command buffers
     command_pool.reserve(framebuffers.iter().count());
 
-    let mut command_buffers: Vec<hal::command::CommandBuffer<back::Backend, hal::Graphics>> = Vec::new();
+    let mut submission_command_buffers: Vec<hal::command::Submit<back::Backend, hal::Graphics, hal::command::MultiShot, hal::command::Primary>> =
+        Vec::new();
 
     for fb in framebuffers.iter() {
         // command buffer will be returned in 'recording' state
-        let mut command_buffer = command_pool.acquire_command_buffer(false);
+        // Shot: how many times a command buffer can be submitted; we want MultiShot (allow submission multiple times)
+        // Level: command buffer type (primary or secondary)
+        let mut command_buffer: hal::command::CommandBuffer<back::Backend, hal::Graphics, hal::command::MultiShot, hal::command::Primary> = command_pool.acquire_command_buffer(false);
 
         // begin render pass
         let render_area = hal::pso::Rect {
@@ -76,44 +87,56 @@ fn create_command_buffers(command_pool: &mut hal::pool::CommandPool<back::Backen
             w: extent.width as _,
             h: extent.height as _,
         };
-        let clear_values = [hal::command::ClearColor::Float([0.0, 0.0, 0.0, 4.0])];
-        let render_pass_inline_encoder = command_buffer.begin_render_pass(render_pass, fb, render_area, clear_values);
+        let clear_values = vec![hal::command::ClearValue::Color(hal::command::ClearColor::Float([0.0, 0.0, 0.0, 4.0]))];
+        let mut render_pass_inline_encoder = {
+            let cmd_buf_ref = &mut command_buffer;
+            cmd_buf_ref.begin_render_pass_inline(render_pass, fb, render_area, clear_values.iter())
+        };
 
         // bind graphics pipeline
-        command_buffer.bind_graphics_pipeline(pipeline);
+        {
+            let cmd_buf_ref = &mut command_buffer;
+            cmd_buf_ref.bind_graphics_pipeline(pipeline);
+        }
 
-        // draw command is best understood by seeing how it expands out in HAL:
+        // HAL encoder draw command is best understood by seeing how it expands out:
         // vertex_count = vertices.end - vertices.start
         // instance_count = instances.end - instances.start
         // first_vertex = vertices.start
         // first_instance = instances.start
         render_pass_inline_encoder.draw(0..3, 0..1);
-        command_buffer.finish();
-        command_buffers.push(command_buffer);
+        let submission_command_buffer = command_buffer.finish();
+        submission_command_buffers.push(submission_command_buffer);
     }
 
-    command_buffers
+    submission_command_buffers
 }
 
-fn create_framebuffers(device: &<back::Backend as hal::Backend>::Device,
-                       render_pass: &<back::Backend as hal::Backend>::RenderPass,
-                       frame_images: &Vec<(<back::Backend as hal::Backend>::Image,
-                                           <back::Backend as hal::Backend>::ImageView,)>,
-                       extent: hal::window::Extent2D)
-                       -> Vec<<back::Backend as hal::Backend>::Framebuffer> {
-
+fn create_framebuffers(
+    device: &<back::Backend as hal::Backend>::Device,
+    render_pass: &<back::Backend as hal::Backend>::RenderPass,
+    frame_images: &Vec<(
+        <back::Backend as hal::Backend>::Image,
+        <back::Backend as hal::Backend>::ImageView,
+    )>,
+    extent: hal::window::Extent2D,
+) -> Vec<<back::Backend as hal::Backend>::Framebuffer> {
     let mut swapchain_framebuffers: Vec<<back::Backend as hal::Backend>::Framebuffer> = Vec::new();
 
     for (_, image_view) in frame_images.iter() {
         // why is extent.depth the same as number of layers in vkSwapchainCreateInfo?
         swapchain_framebuffers.push(
-            device.create_framebuffer(render_pass,
-                                      vec![image_view],
-                                      hal::image::Extent {
-                                          width: extent.width as _,
-                                          height: extent.height as _,
-                                          depth: 1,
-                                      }).expect("failed to create framebuffer!"));
+            device
+                .create_framebuffer(
+                    render_pass,
+                    vec![image_view],
+                    hal::image::Extent {
+                        width: extent.width as _,
+                        height: extent.height as _,
+                        depth: 1,
+                    },
+                ).expect("failed to create framebuffer!"),
+        );
     }
 
     swapchain_framebuffers
@@ -158,26 +181,28 @@ fn create_render_pass(
 
 fn create_graphics_pipeline(
     device: &<back::Backend as hal::Backend>::Device,
-    extent: &hal::window::Extent2D,
+    extent: hal::window::Extent2D,
     render_pass: &<back::Backend as hal::Backend>::RenderPass,
 ) -> (
     Vec<<back::Backend as hal::Backend>::DescriptorSetLayout>,
     <back::Backend as hal::Backend>::PipelineLayout,
     <back::Backend as hal::Backend>::GraphicsPipeline,
 ) {
-    let vert_shader_code =
-        glsl_to_spirv::compile(include_str!("09_shader_base.vert"), glsl_to_spirv::ShaderType::Vertex)
-            .expect("Error compiling vertex shader code.")
-            .bytes()
-            .map(|b| b.unwrap())
-            .collect::<Vec<u8>>();
+    let vert_shader_code = glsl_to_spirv::compile(
+        include_str!("09_shader_base.vert"),
+        glsl_to_spirv::ShaderType::Vertex,
+    ).expect("Error compiling vertex shader code.")
+    .bytes()
+    .map(|b| b.unwrap())
+    .collect::<Vec<u8>>();
 
-    let frag_shader_code =
-        glsl_to_spirv::compile(include_str!("09_shader_base.frag"), glsl_to_spirv::ShaderType::Fragment)
-            .expect("Error compiling fragment shader code.")
-            .bytes()
-            .map(|b| b.unwrap())
-            .collect::<Vec<u8>>();
+    let frag_shader_code = glsl_to_spirv::compile(
+        include_str!("09_shader_base.frag"),
+        glsl_to_spirv::ShaderType::Fragment,
+    ).expect("Error compiling fragment shader code.")
+    .bytes()
+    .map(|b| b.unwrap())
+    .collect::<Vec<u8>>();
 
     let vert_shader_module = device
         .create_shader_module(&vert_shader_code)
@@ -476,52 +501,6 @@ fn create_instance() -> back::Instance {
     back::Instance::create(WINDOW_NAME, 1)
 }
 
-fn init_hal(
-    window: &winit::Window,
-) -> (
-    back::Instance,
-    <back::Backend as hal::Backend>::Device,
-    <back::Backend as hal::Backend>::Swapchain,
-    <back::Backend as hal::Backend>::Surface,
-    Vec<(
-        <back::Backend as hal::Backend>::Image,
-        <back::Backend as hal::Backend>::ImageView,
-    )>,
-    <back::Backend as hal::Backend>::RenderPass,
-    Vec<<back::Backend as hal::Backend>::DescriptorSetLayout>,
-    <back::Backend as hal::Backend>::PipelineLayout,
-    <back::Backend as hal::Backend>::GraphicsPipeline,
-    Vec<<back::Backend as hal::Backend>::Framebuffer>,
-    <back::Backend as hal::Backend>::CommandPool,
-) {
-    let instance = create_instance();
-    let mut surface = create_surface(&instance, window);
-    let mut adapter = pick_adapter(&instance);
-    let (device, _command_queues, queue_type, qf_id) = create_device_with_graphics_queues(&mut adapter, &surface);
-    let (swapchain, extent, backbuffer, format) =
-        create_swap_chain(&adapter, &device, &mut surface, None);
-    let frame_images = create_image_views(backbuffer, format, &device);
-    let render_pass = create_render_pass(&device, Some(format));
-    let swapchain_framebuffers = create_framebuffers(&device, &render_pass, &frame_images, extent);
-    let mut command_pool = create_command_pool(&device, queue_type, qf_id);
-    let command_buffers = create_command_buffers(&mut command_pool, frame_images.iter().count());
-    let (descriptor_set_layouts, pipeline_layout, gfx_pipeline) =
-        create_graphics_pipeline(&device, &extent, &render_pass);
-    (
-        instance,
-        device,
-        swapchain,
-        surface,
-        frame_images,
-        render_pass,
-        descriptor_set_layouts,
-        pipeline_layout,
-        gfx_pipeline,
-        swapchain_framebuffers,
-        command_pool,
-    )
-}
-
 fn clean_up(
     device: <back::Backend as hal::Backend>::Device,
     frame_images: Vec<(
@@ -534,9 +513,9 @@ fn clean_up(
     pipeline_layout: <back::Backend as hal::Backend>::PipelineLayout,
     gfx_pipeline: <back::Backend as hal::Backend>::GraphicsPipeline,
     swapchain_framebuffers: Vec<<back::Backend as hal::Backend>::Framebuffer>,
-    command_pool: <back::Backend as hal::Backend>::CommandPool,
+    command_pool: hal::pool::CommandPool<back::Backend, hal::Graphics>,
 ) {
-    device.destroy_command_pool(command_pool);
+    device.destroy_command_pool(command_pool.into_raw());
 
     for fb in swapchain_framebuffers.into_iter() {
         device.destroy_framebuffer(fb);
@@ -557,6 +536,53 @@ fn clean_up(
     }
 
     device.destroy_swapchain(swapchain);
+}
+
+fn init_hal(
+    window: &winit::Window,
+) -> (
+    back::Instance,
+    <back::Backend as hal::Backend>::Device,
+    <back::Backend as hal::Backend>::Swapchain,
+    <back::Backend as hal::Backend>::Surface,
+    Vec<(
+        <back::Backend as hal::Backend>::Image,
+        <back::Backend as hal::Backend>::ImageView,
+    )>,
+    <back::Backend as hal::Backend>::RenderPass,
+    Vec<<back::Backend as hal::Backend>::DescriptorSetLayout>,
+    <back::Backend as hal::Backend>::PipelineLayout,
+    <back::Backend as hal::Backend>::GraphicsPipeline,
+    Vec<<back::Backend as hal::Backend>::Framebuffer>,
+    hal::pool::CommandPool<back::Backend, hal::Graphics>,
+) {
+    let instance = create_instance();
+    let mut surface = create_surface(&instance, window);
+    let mut adapter = pick_adapter(&instance);
+    let (device, _command_queues, queue_type, qf_id) =
+        create_device_with_graphics_queues(&mut adapter, &surface);
+    let (swapchain, extent, backbuffer, format) =
+        create_swap_chain(&adapter, &device, &mut surface, None);
+    let frame_images = create_image_views(backbuffer, format, &device);
+    let render_pass = create_render_pass(&device, Some(format));
+    let swapchain_framebuffers = create_framebuffers(&device, &render_pass, &frame_images, extent);
+    let (descriptor_set_layouts, pipeline_layout, gfx_pipeline) =
+        create_graphics_pipeline(&device, extent, &render_pass);
+    let mut command_pool = create_command_pool(&device, queue_type, qf_id);
+    let submission_command_buffers = create_command_buffers(&mut command_pool, &render_pass, &swapchain_framebuffers, extent, &gfx_pipeline);
+    (
+        instance,
+        device,
+        swapchain,
+        surface,
+        frame_images,
+        render_pass,
+        descriptor_set_layouts,
+        pipeline_layout,
+        gfx_pipeline,
+        swapchain_framebuffers,
+        command_pool,
+    )
 }
 
 fn main_loop(mut events_loop: winit::EventsLoop) {

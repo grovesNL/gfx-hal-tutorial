@@ -6,8 +6,8 @@ extern crate gfx_backend_metal as back;
 #[cfg(feature = "vulkan")]
 extern crate gfx_backend_vulkan as back;
 extern crate gfx_hal as hal;
-extern crate winit;
 extern crate glsl_to_spirv;
+extern crate winit;
 
 use hal::{Capability, Device, Instance, PhysicalDevice, QueueFamily, Surface, SwapchainConfig};
 use std::io::Read;
@@ -44,25 +44,31 @@ fn main() {
     );
 }
 
-fn create_framebuffers(device: &<back::Backend as hal::Backend>::Device,
-                       render_pass: &<back::Backend as hal::Backend>::RenderPass,
-                       frame_images: &Vec<(<back::Backend as hal::Backend>::Image,
-                                          <back::Backend as hal::Backend>::ImageView,)>,
-                       extent: hal::window::Extent2D)
-    -> Vec<<back::Backend as hal::Backend>::Framebuffer> {
-
+fn create_framebuffers(
+    device: &<back::Backend as hal::Backend>::Device,
+    render_pass: &<back::Backend as hal::Backend>::RenderPass,
+    frame_images: &Vec<(
+        <back::Backend as hal::Backend>::Image,
+        <back::Backend as hal::Backend>::ImageView,
+    )>,
+    extent: hal::window::Extent2D,
+) -> Vec<<back::Backend as hal::Backend>::Framebuffer> {
     let mut swapchain_framebuffers: Vec<<back::Backend as hal::Backend>::Framebuffer> = Vec::new();
 
     for (_, image_view) in frame_images.iter() {
         // why is extent.depth the same as number of layers in vkSwapchainCreateInfo?
         swapchain_framebuffers.push(
-            device.create_framebuffer(render_pass,
-                                      vec![image_view],
-                                      hal::image::Extent {
-                                          width: extent.width as _,
-                                          height: extent.height as _,
-                                          depth: 1,
-                                      }).expect("failed to create framebuffer!"));
+            device
+                .create_framebuffer(
+                    render_pass,
+                    vec![image_view],
+                    hal::image::Extent {
+                        width: extent.width as _,
+                        height: extent.height as _,
+                        depth: 1,
+                    },
+                ).expect("failed to create framebuffer!"),
+        );
     }
 
     swapchain_framebuffers
@@ -107,26 +113,28 @@ fn create_render_pass(
 
 fn create_graphics_pipeline(
     device: &<back::Backend as hal::Backend>::Device,
-    extent: &hal::window::Extent2D,
+    extent: hal::window::Extent2D,
     render_pass: &<back::Backend as hal::Backend>::RenderPass,
 ) -> (
     Vec<<back::Backend as hal::Backend>::DescriptorSetLayout>,
     <back::Backend as hal::Backend>::PipelineLayout,
     <back::Backend as hal::Backend>::GraphicsPipeline,
 ) {
-    let vert_shader_code =
-        glsl_to_spirv::compile(include_str!("09_shader_base.vert"), glsl_to_spirv::ShaderType::Vertex)
-            .expect("Error compiling vertex shader code.")
-            .bytes()
-            .map(|b| b.unwrap())
-            .collect::<Vec<u8>>();
+    let vert_shader_code = glsl_to_spirv::compile(
+        include_str!("09_shader_base.vert"),
+        glsl_to_spirv::ShaderType::Vertex,
+    ).expect("Error compiling vertex shader code.")
+    .bytes()
+    .map(|b| b.unwrap())
+    .collect::<Vec<u8>>();
 
-    let frag_shader_code =
-        glsl_to_spirv::compile(include_str!("09_shader_base.frag"), glsl_to_spirv::ShaderType::Fragment)
-            .expect("Error compiling fragment shader code.")
-            .bytes()
-            .map(|b| b.unwrap())
-            .collect::<Vec<u8>>();
+    let frag_shader_code = glsl_to_spirv::compile(
+        include_str!("09_shader_base.frag"),
+        glsl_to_spirv::ShaderType::Fragment,
+    ).expect("Error compiling fragment shader code.")
+    .bytes()
+    .map(|b| b.unwrap())
+    .collect::<Vec<u8>>();
 
     let vert_shader_module = device
         .create_shader_module(&vert_shader_code)
@@ -448,9 +456,9 @@ fn init_hal(
         create_swap_chain(&adapter, &device, &mut surface, None);
     let frame_images = create_image_views(backbuffer, format, &device);
     let render_pass = create_render_pass(&device, Some(format));
-    let swapchain_framebuffers = create_framebuffers(&device, &render_pass, &frame_images, extent);
     let (descriptor_set_layouts, pipeline_layout, gfx_pipeline) =
-        create_graphics_pipeline(&device, &extent, &render_pass);
+        create_graphics_pipeline(&device, extent, &render_pass);
+    let swapchain_framebuffers = create_framebuffers(&device, &render_pass, &frame_images, extent);
     (
         instance,
         device,

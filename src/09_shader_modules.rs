@@ -8,8 +8,8 @@ extern crate gfx_backend_metal as back;
 #[cfg(feature = "vulkan")]
 extern crate gfx_backend_vulkan as back;
 extern crate gfx_hal as hal;
-extern crate winit;
 extern crate glsl_to_spirv;
+extern crate winit;
 
 use hal::{Capability, Device, Instance, PhysicalDevice, QueueFamily, Surface, SwapchainConfig};
 use std::io::Read;
@@ -28,19 +28,21 @@ fn main() {
 }
 
 fn create_graphics_pipeline(device: &<back::Backend as hal::Backend>::Device) {
-    let vert_shader_code =
-        glsl_to_spirv::compile(include_str!("09_shader_base.vert"), glsl_to_spirv::ShaderType::Vertex)
-        .expect("Error compiling vertex shader code.")
-        .bytes()
-        .map(|b| b.unwrap())
-        .collect::<Vec<u8>>();
+    let vert_shader_code = glsl_to_spirv::compile(
+        include_str!("09_shader_base.vert"),
+        glsl_to_spirv::ShaderType::Vertex,
+    ).expect("Error compiling vertex shader code.")
+    .bytes()
+    .map(|b| b.unwrap())
+    .collect::<Vec<u8>>();
 
-    let frag_shader_code =
-        glsl_to_spirv::compile(include_str!("09_shader_base.frag"), glsl_to_spirv::ShaderType::Fragment)
-            .expect("Error compiling fragment shader code.")
-            .bytes()
-            .map(|b| b.unwrap())
-            .collect::<Vec<u8>>();
+    let frag_shader_code = glsl_to_spirv::compile(
+        include_str!("09_shader_base.frag"),
+        glsl_to_spirv::ShaderType::Fragment,
+    ).expect("Error compiling fragment shader code.")
+    .bytes()
+    .map(|b| b.unwrap())
+    .collect::<Vec<u8>>();
 
     let vert_shader_module = device
         .create_shader_module(&vert_shader_code)
