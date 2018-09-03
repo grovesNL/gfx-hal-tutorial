@@ -88,23 +88,18 @@ fn create_command_buffers<'a>(
             h: extent.height as _,
         };
         let clear_values = vec![hal::command::ClearValue::Color(hal::command::ClearColor::Float([0.0, 0.0, 0.0, 4.0]))];
-        let mut render_pass_inline_encoder = {
-            let cmd_buf_ref = &mut command_buffer;
-            cmd_buf_ref.begin_render_pass_inline(render_pass, fb, render_area, clear_values.iter())
-        };
 
-        // bind graphics pipeline
+        command_buffer.bind_graphics_pipeline(pipeline);
         {
-            let cmd_buf_ref = &mut command_buffer;
-            cmd_buf_ref.bind_graphics_pipeline(pipeline);
+            let mut render_pass_inline_encoder = command_buffer.begin_render_pass_inline(render_pass, fb, render_area, clear_values.iter());
+            // HAL encoder draw command is best understood by seeing how it expands out:
+            // vertex_count = vertices.end - vertices.start
+            // instance_count = instances.end - instances.start
+            // first_vertex = vertices.start
+            // first_instance = instances.start
+            render_pass_inline_encoder.draw(0..3, 0..1);
         }
 
-        // HAL encoder draw command is best understood by seeing how it expands out:
-        // vertex_count = vertices.end - vertices.start
-        // instance_count = instances.end - instances.start
-        // first_vertex = vertices.start
-        // first_instance = instances.start
-        render_pass_inline_encoder.draw(0..3, 0..1);
         let submission_command_buffer = command_buffer.finish();
         submission_command_buffers.push(submission_command_buffer);
     }
