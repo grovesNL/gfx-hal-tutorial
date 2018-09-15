@@ -12,7 +12,7 @@ extern crate winit;
 use hal::{Capability, Device, Instance, PhysicalDevice, QueueFamily, Surface, SwapchainConfig};
 use std::io::Read;
 
-static WINDOW_NAME: &str = "12_gfx_pipeline_complete";
+static WINDOW_NAME: &str = "13_framebuffers";
 
 fn main() {
     env_logger::init();
@@ -28,6 +28,7 @@ fn main() {
         descriptor_set_layouts,
         pipeline_layout,
         gfx_pipeline,
+        swapchain_framebuffers,
     ) = init_hal(&window);
     main_loop(events_loop);
 
@@ -39,7 +40,37 @@ fn main() {
         descriptor_set_layouts,
         pipeline_layout,
         gfx_pipeline,
+        swapchain_framebuffers,
     );
+}
+
+fn create_framebuffers(
+    device: &<back::Backend as hal::Backend>::Device,
+    render_pass: &<back::Backend as hal::Backend>::RenderPass,
+    frame_images: &Vec<(
+        <back::Backend as hal::Backend>::Image,
+        <back::Backend as hal::Backend>::ImageView,
+    )>,
+    extent: hal::window::Extent2D,
+) -> Vec<<back::Backend as hal::Backend>::Framebuffer> {
+    let mut swapchain_framebuffers: Vec<<back::Backend as hal::Backend>::Framebuffer> = Vec::new();
+
+    for (_, image_view) in frame_images.iter() {
+        swapchain_framebuffers.push(
+            device
+                .create_framebuffer(
+                    render_pass,
+                    vec![image_view],
+                    hal::image::Extent {
+                        width: extent.width as _,
+                        height: extent.height as _,
+                        depth: 1,
+                    },
+                ).expect("failed to create framebuffer!"),
+        );
+    }
+
+    swapchain_framebuffers
 }
 
 fn create_render_pass(
@@ -414,6 +445,7 @@ fn init_hal(
     Vec<<back::Backend as hal::Backend>::DescriptorSetLayout>,
     <back::Backend as hal::Backend>::PipelineLayout,
     <back::Backend as hal::Backend>::GraphicsPipeline,
+    Vec<<back::Backend as hal::Backend>::Framebuffer>,
 ) {
     let instance = create_instance();
     let mut surface = create_surface(&instance, window);
@@ -425,6 +457,7 @@ fn init_hal(
     let render_pass = create_render_pass(&device, Some(format));
     let (descriptor_set_layouts, pipeline_layout, gfx_pipeline) =
         create_graphics_pipeline(&device, extent, &render_pass);
+    let swapchain_framebuffers = create_framebuffers(&device, &render_pass, &frame_images, extent);
     (
         instance,
         device,
@@ -435,6 +468,7 @@ fn init_hal(
         descriptor_set_layouts,
         pipeline_layout,
         gfx_pipeline,
+        swapchain_framebuffers,
     )
 }
 
@@ -449,7 +483,12 @@ fn clean_up(
     descriptor_set_layouts: Vec<<back::Backend as hal::Backend>::DescriptorSetLayout>,
     pipeline_layout: <back::Backend as hal::Backend>::PipelineLayout,
     gfx_pipeline: <back::Backend as hal::Backend>::GraphicsPipeline,
+    swapchain_framebuffers: Vec<<back::Backend as hal::Backend>::Framebuffer>,
 ) {
+    for fb in swapchain_framebuffers.into_iter() {
+        device.destroy_framebuffer(fb);
+    }
+
     device.destroy_graphics_pipeline(gfx_pipeline);
 
     for dsl in descriptor_set_layouts.into_iter() {
