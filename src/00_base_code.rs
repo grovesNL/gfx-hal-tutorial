@@ -7,13 +7,7 @@ extern crate gfx_backend_vulkan as back;
 extern crate gfx_hal as hal;
 extern crate winit;
 
-use winit::{WindowBuilder,
-            dpi,
-            Window,
-            EventsLoop,
-            Event,
-            WindowEvent,
-            ControlFlow};
+use winit::{dpi, ControlFlow, Event, EventsLoop, Window, WindowBuilder, WindowEvent};
 
 static WINDOW_NAME: &str = "00_base_code";
 
