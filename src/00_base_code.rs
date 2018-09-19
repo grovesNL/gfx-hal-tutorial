@@ -12,19 +12,8 @@ use winit::{dpi, ControlFlow, Event, EventsLoop, Window, WindowBuilder, WindowEv
 static WINDOW_NAME: &str = "00_base_code";
 
 fn main() {
-    let (window, events_loop) = init_window();
-    let mut application_state = ApplicationState::new(window, events_loop);
-    application_state.main_loop();
-    application_state.clean_up();
-}
-
-fn init_window() -> (Window, EventsLoop) {
-    let events_loop = EventsLoop::new();
-    let window_builder = WindowBuilder::new()
-        .with_dimensions(dpi::LogicalSize::new(1024., 768.))
-        .with_title(WINDOW_NAME.to_string());
-    let window = window_builder.build(&events_loop).unwrap();
-    (window, events_loop)
+    let mut application = ApplicationState::init();
+    application.run();
 }
 
 struct ApplicationState {
@@ -33,12 +22,26 @@ struct ApplicationState {
 }
 
 impl ApplicationState {
-    fn new(window: Window, events_loop: EventsLoop) -> ApplicationState {
+    pub fn init() -> ApplicationState {
+        let (_window, events_loop) = ApplicationState::init_window();
+        ApplicationState::init_hal();
+
         ApplicationState {
-            _window: window,
+            _window,
             events_loop,
         }
     }
+
+    fn init_window() -> (Window, EventsLoop) {
+        let events_loop = EventsLoop::new();
+        let window_builder = WindowBuilder::new()
+            .with_dimensions(dpi::LogicalSize::new(1024., 768.))
+            .with_title(WINDOW_NAME.to_string());
+        let window = window_builder.build(&events_loop).unwrap();
+        (window, events_loop)
+    }
+
+    fn init_hal() {}
 
     fn clean_up(&self) {
         // winit handles window destruction
@@ -54,4 +57,9 @@ impl ApplicationState {
         });
     }
 
+    pub fn run(&mut self) {
+        self.main_loop();
+        self.clean_up();
+    }
 }
+

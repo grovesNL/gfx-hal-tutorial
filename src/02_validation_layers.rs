@@ -10,7 +10,7 @@ extern crate winit;
 
 use winit::{dpi, ControlFlow, Event, EventsLoop, Window, WindowBuilder, WindowEvent};
 
-static WINDOW_NAME: &str = "02_validation_layers";
+static WINDOW_NAME: &str = "01_instance_creation";
 
 fn main() {
     // if building in debug mode, vulkan backend initializes standard validation layers
@@ -20,19 +20,8 @@ fn main() {
     // powershell: $env:RUST_LOG="warn"; cargo run --bin 02_validation_layers --features vulkan
     // see: https://docs.rs/env_logger/0.5.13/env_logger/
     env_logger::init();
-    let (window, events_loop) = init_window();
-    let mut application_state = ApplicationState::new(window, events_loop);
-    application_state.main_loop();
-    application_state.clean_up();
-}
-
-fn init_window() -> (Window, EventsLoop) {
-    let events_loop = EventsLoop::new();
-    let window_builder = WindowBuilder::new()
-        .with_dimensions(dpi::LogicalSize::new(1024., 768.))
-        .with_title(WINDOW_NAME.to_string());
-    let window = window_builder.build(&events_loop).unwrap();
-    (window, events_loop)
+    let mut application = ApplicationState::init();
+    application.run();
 }
 
 struct ApplicationState {
@@ -42,7 +31,8 @@ struct ApplicationState {
 }
 
 impl ApplicationState {
-    pub fn new(_window: Window, events_loop: EventsLoop) -> ApplicationState {
+    pub fn init() -> ApplicationState {
+        let (_window, events_loop) = ApplicationState::init_window();
         let _instance = ApplicationState::init_hal();
 
         ApplicationState {
@@ -52,18 +42,26 @@ impl ApplicationState {
         }
     }
 
+    fn init_window() -> (Window, EventsLoop) {
+        let events_loop = EventsLoop::new();
+        let window_builder = WindowBuilder::new()
+            .with_dimensions(dpi::LogicalSize::new(1024., 768.))
+            .with_title(WINDOW_NAME.to_string());
+        let window = window_builder.build(&events_loop).unwrap();
+        (window, events_loop)
+    }
+
+    fn init_hal() -> back::Instance {
+        let instance = ApplicationState::create_instance();
+
+        instance
+    }
+
     fn create_instance() -> back::Instance {
         back::Instance::create(WINDOW_NAME, 1)
     }
 
-    fn init_hal() -> back::Instance {
-        let _instance = ApplicationState::create_instance();
-
-        _instance
-    }
-
     fn clean_up(&self) {
-        // winit handles window destruction
     }
 
     fn main_loop(&mut self) {
@@ -75,4 +73,10 @@ impl ApplicationState {
             _ => ControlFlow::Continue,
         });
     }
+
+    pub fn run(&mut self) {
+        self.main_loop();
+        self.clean_up();
+    }
 }
+
