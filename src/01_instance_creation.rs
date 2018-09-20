@@ -12,25 +12,25 @@ use winit::{dpi, ControlFlow, Event, EventsLoop, Window, WindowBuilder, WindowEv
 static WINDOW_NAME: &str = "01_instance_creation";
 
 fn main() {
-    let mut application = ApplicationState::init();
+    let mut application = HelloTriangleApplication::init();
     application.run();
 }
 
-struct ApplicationState {
-    _window: Window,
-    events_loop: EventsLoop,
+struct HelloTriangleApplication {
     _instance: back::Instance,
+    events_loop: EventsLoop,
+    _window: Window,
 }
 
-impl ApplicationState {
-    pub fn init() -> ApplicationState {
-        let (_window, events_loop) = ApplicationState::init_window();
-        let _instance = ApplicationState::init_hal();
+impl HelloTriangleApplication {
+    pub fn init() -> HelloTriangleApplication {
+        let (_window, events_loop) = HelloTriangleApplication::init_window();
+        let _instance = HelloTriangleApplication::init_hal();
 
-        ApplicationState {
-            _window,
-            events_loop,
+        HelloTriangleApplication {
             _instance,
+            events_loop,
+            _window,
         }
     }
 
@@ -44,7 +44,7 @@ impl ApplicationState {
     }
 
     fn init_hal() -> back::Instance {
-        let instance = ApplicationState::create_instance();
+        let instance = HelloTriangleApplication::create_instance();
 
         instance
     }

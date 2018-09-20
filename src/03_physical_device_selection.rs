@@ -21,15 +21,15 @@ fn main() {
     // powershell: $env:RUST_LOG="warn"; cargo run --bin 02_validation_layers --features vulkan
     // see: https://docs.rs/env_logger/0.5.13/env_logger/
     env_logger::init();
-    let mut application = ApplicationState::init();
+    let mut application = HelloTriangleApplication::init();
     application.run();
 }
 
-struct ApplicationState {
-    _window: Window,
-    events_loop: EventsLoop,
-    _instance: back::Instance,
+struct HelloTriangleApplication {
     _adapter: Adapter<back::Backend>,
+    _instance: back::Instance,
+    events_loop: EventsLoop,
+    _window: Window,
 }
 
 #[derive(Default)]
@@ -43,16 +43,16 @@ impl QueueFamilyIds {
     }
 }
 
-impl ApplicationState {
-    pub fn init() -> ApplicationState {
-        let (_window, events_loop) = ApplicationState::init_window();
-        let (_instance, _adapter) = ApplicationState::init_hal();
+impl HelloTriangleApplication {
+    pub fn init() -> HelloTriangleApplication {
+        let (_window, events_loop) = HelloTriangleApplication::init_window();
+        let (_instance, _adapter) = HelloTriangleApplication::init_hal();
 
-        ApplicationState {
-            _window,
-            events_loop,
-            _instance,
+        HelloTriangleApplication {
             _adapter,
+            _instance,
+            events_loop,
+            _window,
         }
     }
 
@@ -66,8 +66,8 @@ impl ApplicationState {
     }
 
     fn init_hal() -> (back::Instance, Adapter<back::Backend>) {
-        let instance = ApplicationState::create_instance();
-        let adapter = ApplicationState::pick_adapter(&instance);
+        let instance = HelloTriangleApplication::create_instance();
+        let adapter = HelloTriangleApplication::pick_adapter(&instance);
 
         (instance, adapter)
     }
@@ -93,13 +93,13 @@ impl ApplicationState {
     }
 
     fn is_adapter_suitable(adapter: &Adapter<back::Backend>) -> bool {
-        ApplicationState::find_queue_families(adapter).is_complete()
+        HelloTriangleApplication::find_queue_families(adapter).is_complete()
     }
 
     fn pick_adapter(instance: &back::Instance) -> Adapter<back::Backend> {
         let adapters = instance.enumerate_adapters();
         for adapter in adapters {
-            if ApplicationState::is_adapter_suitable(&adapter) {
+            if HelloTriangleApplication::is_adapter_suitable(&adapter) {
                 return adapter;
             }
         }

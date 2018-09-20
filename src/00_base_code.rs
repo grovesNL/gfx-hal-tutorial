@@ -12,23 +12,26 @@ use winit::{dpi, ControlFlow, Event, EventsLoop, Window, WindowBuilder, WindowEv
 static WINDOW_NAME: &str = "00_base_code";
 
 fn main() {
-    let mut application = ApplicationState::init();
+    let mut application = HelloTriangleApplication::init();
     application.run();
 }
 
-struct ApplicationState {
-    _window: Window,
+struct HelloTriangleApplication {
+    // Rust drops struct fields in the order in which they are declared
+    // we'll order fields in the order we would want them to be destroyed
+    // for most fields, it doesn't matter, but places where it matters will be pointed out
     events_loop: EventsLoop,
+    _window: Window,
 }
 
-impl ApplicationState {
-    pub fn init() -> ApplicationState {
-        let (_window, events_loop) = ApplicationState::init_window();
-        ApplicationState::init_hal();
+impl HelloTriangleApplication {
+    pub fn init() -> HelloTriangleApplication {
+        let (_window, events_loop) = HelloTriangleApplication::init_window();
+        HelloTriangleApplication::init_hal();
 
-        ApplicationState {
-            _window,
+        HelloTriangleApplication {
             events_loop,
+            _window,
         }
     }
 

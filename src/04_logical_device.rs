@@ -23,18 +23,18 @@ fn main() {
     // powershell: $env:RUST_LOG="warn"; cargo run --bin 02_validation_layers --features vulkan
     // see: https://docs.rs/env_logger/0.5.13/env_logger/
     env_logger::init();
-    let mut application = ApplicationState::init();
+    let mut application = HelloTriangleApplication::init();
     application.run();
 }
 
-struct ApplicationState {
-    _window: Window,
-    events_loop: EventsLoop,
-    _instance: back::Instance,
-    _adapter: Adapter<back::Backend>,
+struct HelloTriangleApplication {
+    // we want command queues and device to be dropped before instance!
+    _command_queues: Vec<queue::CommandQueue<back::Backend, Graphics>>,
     _device: <back::Backend as Backend>::Device,
-    command_queues: Vec<queue::CommandQueue<back::Backend, Graphics>>,
-
+    _adapter: Adapter<back::Backend>,
+    _instance: back::Instance,
+    events_loop: EventsLoop,
+    _window: Window,
 }
 
 #[derive(Default)]
@@ -48,18 +48,18 @@ impl QueueFamilyIds {
     }
 }
 
-impl ApplicationState {
-    pub fn init() -> ApplicationState {
-        let (_window, events_loop) = ApplicationState::init_window();
-        let (_instance, _adapter, _device, command_queues) = ApplicationState::init_hal();
+impl HelloTriangleApplication {
+    pub fn init() -> HelloTriangleApplication {
+        let (_window, events_loop) = HelloTriangleApplication::init_window();
+        let (_instance, _adapter, _device, _command_queues) = HelloTriangleApplication::init_hal();
 
-        ApplicationState {
-            _window,
-            events_loop,
-            _instance,
-            _adapter,
+        HelloTriangleApplication {
+            _command_queues,
             _device,
-            command_queues,
+            _adapter,
+            _instance,
+            events_loop,
+            _window,
         }
     }
 
@@ -73,10 +73,10 @@ impl ApplicationState {
     }
 
     fn init_hal() -> (back::Instance, Adapter<back::Backend>, <back::Backend as Backend>::Device, Vec<queue::CommandQueue<back::Backend, Graphics>>) {
-        let instance = ApplicationState::create_instance();
-        let mut adapter = ApplicationState::pick_adapter(&instance);
+        let instance = HelloTriangleApplication::create_instance();
+        let mut adapter = HelloTriangleApplication::pick_adapter(&instance);
 
-        let (device, command_queues) = ApplicationState::create_device_with_graphics_queues(&mut adapter);
+        let (device, command_queues) = HelloTriangleApplication::create_device_with_graphics_queues(&mut adapter);
 
         (instance, adapter, device, command_queues)
     }
@@ -102,13 +102,13 @@ impl ApplicationState {
     }
 
     fn is_adapter_suitable(adapter: &Adapter<back::Backend>) -> bool {
-        ApplicationState::find_queue_families(adapter).is_complete()
+        HelloTriangleApplication::find_queue_families(adapter).is_complete()
     }
 
     fn pick_adapter(instance: &back::Instance) -> Adapter<back::Backend> {
         let adapters = instance.enumerate_adapters();
         for adapter in adapters {
-            if ApplicationState::is_adapter_suitable(&adapter) {
+            if HelloTriangleApplication::is_adapter_suitable(&adapter) {
                 return adapter;
             }
         }
@@ -147,7 +147,6 @@ impl ApplicationState {
     }
 
     fn clean_up(&self) {
-        // command queues will drop automatically, but we need to give struct hint to make sure it drops before instance is dropped
     }
 
     fn main_loop(&mut self) {
