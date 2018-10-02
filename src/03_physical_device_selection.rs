@@ -11,15 +11,9 @@ extern crate winit;
 use hal::{queue, Adapter, Instance, QueueFamily};
 use winit::{dpi, ControlFlow, Event, EventsLoop, Window, WindowBuilder, WindowEvent};
 
-static WINDOW_NAME: &str = "01_instance_creation";
+static WINDOW_NAME: &str = "03_physical_device_selection";
 
 fn main() {
-    // if building in debug mode, vulkan backend initializes standard validation layers
-    // all we need to do is enable logging
-    // run the program like so to print all logs of level 'warn' and above:
-    // bash: RUST_LOG=warn && cargo run --bin 02_validation_layers --features vulkan
-    // powershell: $env:RUST_LOG="warn"; cargo run --bin 02_validation_layers --features vulkan
-    // see: https://docs.rs/env_logger/0.5.13/env_logger/
     env_logger::init();
     let mut application = HelloTriangleApplication::init();
     application.run();

@@ -16,12 +16,6 @@ use winit::{dpi, ControlFlow, Event, EventsLoop, Window, WindowBuilder, WindowEv
 static WINDOW_NAME: &str = "06_swap_chain_creation";
 
 fn main() {
-    // if building in debug mode, vulkan backend initializes standard validation layers
-    // all we need to do is enable logging
-    // run the program like so to print all logs of level 'warn' and above:
-    // bash: RUST_LOG=warn && cargo run --bin 02_validation_layers --features vulkan
-    // powershell: $env:RUST_LOG="warn"; cargo run --bin 02_validation_layers --features vulkan
-    // see: https://docs.rs/env_logger/0.5.13/env_logger/
     env_logger::init();
     let mut application = HelloTriangleApplication::init();
     application.run();
@@ -29,7 +23,6 @@ fn main() {
 
 struct HelloTriangleApplication {
     _format: format::Format,
-    _backbuffer: Backbuffer<back::Backend>,
     swapchain: Option<<back::Backend as Backend>::Swapchain>,
     _command_queues: Vec<queue::CommandQueue<back::Backend, Graphics>>,
     device: <back::Backend as Backend>::Device,
@@ -58,7 +51,6 @@ impl HelloTriangleApplication {
 
         HelloTriangleApplication {
             _format,
-            _backbuffer,
             swapchain: Some(swapchain),
             _command_queues,
             device,
@@ -211,6 +203,7 @@ impl HelloTriangleApplication {
 impl Drop for HelloTriangleApplication {
     fn drop(&mut self) {
         // destroy swapchain before any of the already implemented drops kick in
+        let swapchain = self.swapchain.take().unwrap();
         self.device.destroy_swapchain(swapchain);
     }
 }
