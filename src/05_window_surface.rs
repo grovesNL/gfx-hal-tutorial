@@ -159,10 +159,6 @@ impl HelloTriangleApplication {
         (device, command_queues)
     }
 
-
-    fn clean_up(&self) {
-    }
-
     fn main_loop(&mut self) {
         self.events_loop.run_forever(|event| match event {
             Event::WindowEvent {
@@ -176,6 +172,11 @@ impl HelloTriangleApplication {
     pub fn run(&mut self) {
         self.main_loop();
         self.clean_up();
+    }
+}
+
+impl Drop for HelloTriangleApplication {
+    fn drop(&mut self) {
     }
 }
 

@@ -193,12 +193,6 @@ impl HelloTriangleApplication {
         (swapchain, backbuffer, format)
     }
 
-    fn clean_up(&mut self) {
-        //swapchain must be explicitly destroyed
-        let swapchain = self.swapchain.take().unwrap();
-        self.device.destroy_swapchain(swapchain);
-    }
-
     fn main_loop(&mut self) {
         self.events_loop.run_forever(|event| match event {
             Event::WindowEvent {
@@ -211,6 +205,12 @@ impl HelloTriangleApplication {
 
     pub fn run(&mut self) {
         self.main_loop();
-        self.clean_up();
+    }
+}
+
+impl Drop for HelloTriangleApplication {
+    fn drop(&mut self) {
+        // destroy swapchain before any of the already implemented drops kick in
+        self.device.destroy_swapchain(swapchain);
     }
 }

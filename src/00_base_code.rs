@@ -46,10 +46,6 @@ impl HelloTriangleApplication {
 
     fn init_hal() {}
 
-    fn clean_up(&self) {
-        // winit handles window destruction
-    }
-
     fn main_loop(&mut self) {
         self.events_loop.run_forever(|event| match event {
             Event::WindowEvent {
@@ -62,7 +58,12 @@ impl HelloTriangleApplication {
 
     pub fn run(&mut self) {
         self.main_loop();
-        self.clean_up();
+    }
+}
+
+impl Drop for HelloTriangleApplication {
+    fn drop(&mut self) {
+        // window/events_loop already implement drop
     }
 }
 

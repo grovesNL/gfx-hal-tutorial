@@ -10,7 +10,7 @@ extern crate winit;
 
 use winit::{dpi, ControlFlow, Event, EventsLoop, Window, WindowBuilder, WindowEvent};
 
-static WINDOW_NAME: &str = "01_instance_creation";
+static WINDOW_NAME: &str = "02_validation_layers";
 
 fn main() {
     // if building in debug mode, vulkan backend initializes standard validation layers
@@ -76,7 +76,13 @@ impl HelloTriangleApplication {
 
     pub fn run(&mut self) {
         self.main_loop();
-        self.clean_up();
     }
 }
+
+impl Drop for HelloTriangleApplication {
+    fn drop(&mut self) {
+        // instance already implements drop
+    }
+}
+
 
