@@ -73,4 +73,3 @@ impl Drop for HelloTriangleApplication {
         // instance already implements drop
     }
 }
-

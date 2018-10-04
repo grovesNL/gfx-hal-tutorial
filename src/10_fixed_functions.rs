@@ -10,10 +10,11 @@ extern crate glsl_to_spirv;
 extern crate winit;
 
 use hal::{
-    queue, Adapter, Backend, Capability, Gpu, Graphics, Instance, PhysicalDevice, QueueFamily, Surface, format, Backbuffer, SwapchainConfig, Device,
+    format, queue, Adapter, Backbuffer, Backend, Capability, Device, Gpu, Graphics, Instance,
+    PhysicalDevice, QueueFamily, Surface, SwapchainConfig,
 };
-use winit::{dpi, ControlFlow, Event, EventsLoop, Window, WindowBuilder, WindowEvent};
 use std::io::Read;
+use winit::{dpi, ControlFlow, Event, EventsLoop, Window, WindowBuilder, WindowEvent};
 
 static WINDOW_NAME: &str = "09_shader_modules";
 
@@ -26,7 +27,12 @@ fn main() {
 struct HelloTriangleApplication {
     descriptor_set_layouts: Option<Vec<<back::Backend as hal::Backend>::DescriptorSetLayout>>,
     pipeline_layout: Option<<back::Backend as hal::Backend>::PipelineLayout>,
-    frame_images: Option<Vec<(<back::Backend as Backend>::Image, <back::Backend as Backend>::ImageView,)>>,
+    frame_images: Option<
+        Vec<(
+            <back::Backend as Backend>::Image,
+            <back::Backend as Backend>::ImageView,
+        )>,
+    >,
     _format: format::Format,
     swapchain: Option<<back::Backend as Backend>::Swapchain>,
     _command_queues: Vec<queue::CommandQueue<back::Backend, Graphics>>,
@@ -52,7 +58,18 @@ impl QueueFamilyIds {
 impl HelloTriangleApplication {
     pub fn init() -> HelloTriangleApplication {
         let (window, events_loop) = HelloTriangleApplication::init_window();
-        let (_instance, _adapter, _surface, device, _command_queues, swapchain, _format, frame_images, pipeline_layout, descriptor_set_layout) = HelloTriangleApplication::init_hal(&window);
+        let (
+            _instance,
+            _adapter,
+            _surface,
+            device,
+            _command_queues,
+            swapchain,
+            _format,
+            frame_images,
+            pipeline_layout,
+            descriptor_set_layout,
+        ) = HelloTriangleApplication::init_hal(&window);
 
         HelloTriangleApplication {
             descriptor_set_layouts: Some(descriptor_set_layout),
@@ -79,7 +96,9 @@ impl HelloTriangleApplication {
         (window, events_loop)
     }
 
-    fn init_hal(window: &Window) -> (
+    fn init_hal(
+        window: &Window,
+    ) -> (
         back::Instance,
         Adapter<back::Backend>,
         <back::Backend as Backend>::Surface,
@@ -87,28 +106,37 @@ impl HelloTriangleApplication {
         Vec<queue::CommandQueue<back::Backend, Graphics>>,
         <back::Backend as Backend>::Swapchain,
         format::Format,
-        Vec<(<back::Backend as Backend>::Image, <back::Backend as Backend>::ImageView,)>,
+        Vec<(
+            <back::Backend as Backend>::Image,
+            <back::Backend as Backend>::ImageView,
+        )>,
         <back::Backend as hal::Backend>::PipelineLayout,
         Vec<<back::Backend as hal::Backend>::DescriptorSetLayout>,
     ) {
         let instance = HelloTriangleApplication::create_instance();
         let mut adapter = HelloTriangleApplication::pick_adapter(&instance);
         let mut surface = HelloTriangleApplication::create_surface(&instance, window);
-        let (device, command_queues) = HelloTriangleApplication::create_device_with_graphics_queues(&mut adapter, &surface);
-        let (swapchain, extent, backbuffer, format) = HelloTriangleApplication::create_swap_chain(&adapter, &device, &mut surface, None);
-        let frame_images = HelloTriangleApplication::create_image_views(backbuffer, format, &device);
-        let (ds_layouts, pipeline_layout) = HelloTriangleApplication::create_graphics_pipeline(&device, extent);
+        let (device, command_queues) =
+            HelloTriangleApplication::create_device_with_graphics_queues(&mut adapter, &surface);
+        let (swapchain, extent, backbuffer, format) =
+            HelloTriangleApplication::create_swap_chain(&adapter, &device, &mut surface, None);
+        let frame_images =
+            HelloTriangleApplication::create_image_views(backbuffer, format, &device);
+        let (ds_layouts, pipeline_layout) =
+            HelloTriangleApplication::create_graphics_pipeline(&device, extent);
 
-        (instance,
-         adapter,
-         surface,
-         device,
-         command_queues,
-         swapchain,
-         format,
-         frame_images,
-         pipeline_layout,
-         ds_layouts)
+        (
+            instance,
+            adapter,
+            surface,
+            device,
+            command_queues,
+            swapchain,
+            format,
+            frame_images,
+            pipeline_layout,
+            ds_layouts,
+        )
     }
 
     fn create_instance() -> back::Instance {
@@ -211,13 +239,17 @@ impl HelloTriangleApplication {
 
         let swap_config = SwapchainConfig::from_caps(&caps, format);
         let extent = swap_config.extent.clone();
-        let (swapchain, backbuffer) = device.create_swapchain(surface, swap_config, previous_swapchain);
+        let (swapchain, backbuffer) =
+            device.create_swapchain(surface, swap_config, previous_swapchain);
 
         (swapchain, extent, backbuffer, format)
     }
 
-
-    fn create_image_views(backbuffer: Backbuffer<back::Backend>, format: format::Format, device: &<back::Backend as Backend>::Device) -> Vec<(
+    fn create_image_views(
+        backbuffer: Backbuffer<back::Backend>,
+        format: format::Format,
+        device: &<back::Backend as Backend>::Device,
+    ) -> Vec<(
         <back::Backend as hal::Backend>::Image,
         <back::Backend as hal::Backend>::ImageView,
     )> {
@@ -258,17 +290,17 @@ impl HelloTriangleApplication {
             include_str!("09_shader_base.vert"),
             glsl_to_spirv::ShaderType::Vertex,
         ).expect("Error compiling vertex shader code.")
-            .bytes()
-            .map(|b| b.unwrap())
-            .collect::<Vec<u8>>();
+        .bytes()
+        .map(|b| b.unwrap())
+        .collect::<Vec<u8>>();
 
         let frag_shader_code = glsl_to_spirv::compile(
             include_str!("09_shader_base.frag"),
             glsl_to_spirv::ShaderType::Fragment,
         ).expect("Error compiling fragment shader code.")
-            .bytes()
-            .map(|b| b.unwrap())
-            .collect::<Vec<u8>>();
+        .bytes()
+        .map(|b| b.unwrap())
+        .collect::<Vec<u8>>();
 
         let vert_shader_module = device
             .create_shader_module(&vert_shader_code)
@@ -439,4 +471,3 @@ impl Drop for HelloTriangleApplication {
         self.device.destroy_swapchain(swapchain);
     }
 }
-

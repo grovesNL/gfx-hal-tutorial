@@ -120,4 +120,3 @@ impl Drop for HelloTriangleApplication {
         // device already implements drop
     }
 }
-

@@ -9,7 +9,8 @@ extern crate gfx_hal as hal;
 extern crate winit;
 
 use hal::{
-    queue, Adapter, Backend, Capability, Gpu, Graphics, Instance, PhysicalDevice, QueueFamily, Surface, format, Backbuffer, SwapchainConfig, Device,
+    format, queue, Adapter, Backbuffer, Backend, Capability, Device, Gpu, Graphics, Instance,
+    PhysicalDevice, QueueFamily, Surface, SwapchainConfig,
 };
 use winit::{dpi, ControlFlow, Event, EventsLoop, Window, WindowBuilder, WindowEvent};
 
@@ -47,7 +48,16 @@ impl QueueFamilyIds {
 impl HelloTriangleApplication {
     pub fn init() -> HelloTriangleApplication {
         let (window, events_loop) = HelloTriangleApplication::init_window();
-        let (_instance, _adapter, _surface, device, _command_queues, swapchain, _backbuffer, _format) = HelloTriangleApplication::init_hal(&window);
+        let (
+            _instance,
+            _adapter,
+            _surface,
+            device,
+            _command_queues,
+            swapchain,
+            _backbuffer,
+            _format,
+        ) = HelloTriangleApplication::init_hal(&window);
 
         HelloTriangleApplication {
             _format,
@@ -71,14 +81,36 @@ impl HelloTriangleApplication {
         (window, events_loop)
     }
 
-    fn init_hal(window: &Window) -> (back::Instance, Adapter<back::Backend>, <back::Backend as Backend>::Surface, <back::Backend as Backend>::Device, Vec<queue::CommandQueue<back::Backend, Graphics>>, <back::Backend as Backend>::Swapchain, Backbuffer<back::Backend>, format::Format) {
+    fn init_hal(
+        window: &Window,
+    ) -> (
+        back::Instance,
+        Adapter<back::Backend>,
+        <back::Backend as Backend>::Surface,
+        <back::Backend as Backend>::Device,
+        Vec<queue::CommandQueue<back::Backend, Graphics>>,
+        <back::Backend as Backend>::Swapchain,
+        Backbuffer<back::Backend>,
+        format::Format,
+    ) {
         let instance = HelloTriangleApplication::create_instance();
         let mut adapter = HelloTriangleApplication::pick_adapter(&instance);
         let mut surface = HelloTriangleApplication::create_surface(&instance, window);
-        let (device, command_queues) = HelloTriangleApplication::create_device_with_graphics_queues(&mut adapter, &surface);
-        let (swapchain, backbuffer, format) = HelloTriangleApplication::create_swap_chain(&adapter, &device, &mut surface, None);
+        let (device, command_queues) =
+            HelloTriangleApplication::create_device_with_graphics_queues(&mut adapter, &surface);
+        let (swapchain, backbuffer, format) =
+            HelloTriangleApplication::create_swap_chain(&adapter, &device, &mut surface, None);
 
-        (instance, adapter, surface, device, command_queues, swapchain, backbuffer, format)
+        (
+            instance,
+            adapter,
+            surface,
+            device,
+            command_queues,
+            swapchain,
+            backbuffer,
+            format,
+        )
     }
 
     fn create_instance() -> back::Instance {
@@ -180,7 +212,8 @@ impl HelloTriangleApplication {
 
         let swap_config = SwapchainConfig::from_caps(&caps, format);
 
-        let (swapchain, backbuffer) = device.create_swapchain(surface, swap_config, previous_swapchain);
+        let (swapchain, backbuffer) =
+            device.create_swapchain(surface, swap_config, previous_swapchain);
 
         (swapchain, backbuffer, format)
     }

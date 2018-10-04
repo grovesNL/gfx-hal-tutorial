@@ -9,7 +9,8 @@ extern crate gfx_hal as hal;
 extern crate winit;
 
 use hal::{
-    queue, Adapter, Backend, Capability, Gpu, Graphics, Instance, PhysicalDevice, QueueFamily, Surface,
+    queue, Adapter, Backend, Capability, Gpu, Graphics, Instance, PhysicalDevice, QueueFamily,
+    Surface,
 };
 use winit::{dpi, ControlFlow, Event, EventsLoop, Window, WindowBuilder, WindowEvent};
 
@@ -45,7 +46,8 @@ impl QueueFamilyIds {
 impl HelloTriangleApplication {
     pub fn init() -> HelloTriangleApplication {
         let (window, events_loop) = HelloTriangleApplication::init_window();
-        let (_instance, _adapter, _surface, _device, _command_queues) = HelloTriangleApplication::init_hal(&window);
+        let (_instance, _adapter, _surface, _device, _command_queues) =
+            HelloTriangleApplication::init_hal(&window);
 
         HelloTriangleApplication {
             _command_queues,
@@ -67,11 +69,20 @@ impl HelloTriangleApplication {
         (window, events_loop)
     }
 
-    fn init_hal(window: &Window) -> (back::Instance, Adapter<back::Backend>, <back::Backend as Backend>::Surface, <back::Backend as Backend>::Device, Vec<queue::CommandQueue<back::Backend, Graphics>>) {
+    fn init_hal(
+        window: &Window,
+    ) -> (
+        back::Instance,
+        Adapter<back::Backend>,
+        <back::Backend as Backend>::Surface,
+        <back::Backend as Backend>::Device,
+        Vec<queue::CommandQueue<back::Backend, Graphics>>,
+    ) {
         let instance = HelloTriangleApplication::create_instance();
         let mut adapter = HelloTriangleApplication::pick_adapter(&instance);
         let surface = HelloTriangleApplication::create_surface(&instance, window);
-        let (device, command_queues) = HelloTriangleApplication::create_device_with_graphics_queues(&mut adapter, &surface);
+        let (device, command_queues) =
+            HelloTriangleApplication::create_device_with_graphics_queues(&mut adapter, &surface);
 
         (instance, adapter, surface, device, command_queues)
     }
@@ -170,7 +181,5 @@ impl HelloTriangleApplication {
 }
 
 impl Drop for HelloTriangleApplication {
-    fn drop(&mut self) {
-    }
+    fn drop(&mut self) {}
 }
-

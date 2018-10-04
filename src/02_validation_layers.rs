@@ -61,8 +61,7 @@ impl HelloTriangleApplication {
         back::Instance::create(WINDOW_NAME, 1)
     }
 
-    fn clean_up(&self) {
-    }
+    fn clean_up(&self) {}
 
     fn main_loop(&mut self) {
         self.events_loop.run_forever(|event| match event {
@@ -84,5 +83,3 @@ impl Drop for HelloTriangleApplication {
         // instance already implements drop
     }
 }
-
-

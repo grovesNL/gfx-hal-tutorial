@@ -66,11 +66,17 @@ impl HelloTriangleApplication {
         (window, events_loop)
     }
 
-    fn init_hal() -> (back::Instance, Adapter<back::Backend>, <back::Backend as Backend>::Device, Vec<queue::CommandQueue<back::Backend, Graphics>>) {
+    fn init_hal() -> (
+        back::Instance,
+        Adapter<back::Backend>,
+        <back::Backend as Backend>::Device,
+        Vec<queue::CommandQueue<back::Backend, Graphics>>,
+    ) {
         let instance = HelloTriangleApplication::create_instance();
         let mut adapter = HelloTriangleApplication::pick_adapter(&instance);
 
-        let (device, command_queues) = HelloTriangleApplication::create_device_with_graphics_queues(&mut adapter);
+        let (device, command_queues) =
+            HelloTriangleApplication::create_device_with_graphics_queues(&mut adapter);
 
         (instance, adapter, device, command_queues)
     }
@@ -156,6 +162,5 @@ impl HelloTriangleApplication {
 }
 
 impl Drop for HelloTriangleApplication {
-    fn drop(&mut self) {
-    }
+    fn drop(&mut self) {}
 }

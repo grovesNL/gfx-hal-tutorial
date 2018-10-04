@@ -66,4 +66,3 @@ impl Drop for HelloTriangleApplication {
         // window/events_loop already implement drop
     }
 }
-
