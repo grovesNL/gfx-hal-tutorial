@@ -26,7 +26,12 @@ fn main() {
     application.run();
 }
 
-struct HelloTriangleApplication {
+struct WindowState {
+    events_loop: Option<EventsLoop>,
+    window: Window,
+}
+
+struct HALState {
     in_flight_fences: Option<Vec<<back::Backend as Backend>::Fence>>,
     render_finished_semaphores: Option<Vec<<back::Backend as Backend>::Semaphore>>,
     image_available_semaphores: Option<Vec<<back::Backend as Backend>::Semaphore>>,
@@ -51,8 +56,11 @@ struct HelloTriangleApplication {
     _surface: <back::Backend as Backend>::Surface,
     _adapter: Adapter<back::Backend>,
     _instance: back::Instance,
-    events_loop: Option<EventsLoop>,
-    _window: Window,
+}
+
+struct HelloTriangleApplication {
+    hal_state: HALState,
+    window_state: WindowState,
 }
 
 #[derive(Default)]
@@ -68,86 +76,31 @@ impl QueueFamilyIds {
 
 impl HelloTriangleApplication {
     pub fn init() -> HelloTriangleApplication {
-        let (window, events_loop) = HelloTriangleApplication::init_window();
-        let (
-            _instance,
-            _adapter,
-            _surface,
-            device,
-            command_queues,
-            swapchain,
-            _format,
-            frame_images,
-            render_pass,
-            pipeline_layout,
-            descriptor_set_layout,
-            gfx_pipeline,
-            swapchain_framebuffers,
-            command_pool,
-            submission_command_buffers,
-            image_available_semaphores,
-            render_finished_semaphores,
-            in_flight_fences,
-        ) = HelloTriangleApplication::init_hal(&window);
+        let window_state = HelloTriangleApplication::init_window();
+        let hal_state = HelloTriangleApplication::init_hal(&window_state.window);
 
         HelloTriangleApplication {
-            in_flight_fences: Some(in_flight_fences),
-            render_finished_semaphores: Some(render_finished_semaphores),
-            image_available_semaphores: Some(image_available_semaphores),
-            submission_command_buffers: Some(submission_command_buffers),
-            command_pool: Some(command_pool),
-            swapchain_framebuffers: Some(swapchain_framebuffers),
-            gfx_pipeline: Some(gfx_pipeline),
-            descriptor_set_layouts: Some(descriptor_set_layout),
-            pipeline_layout: Some(pipeline_layout),
-            render_pass: Some(render_pass),
-            frame_images: Some(frame_images),
-            _format,
-            swapchain: Some(swapchain),
-            command_queues,
-            device,
-            _surface,
-            _adapter,
-            _instance,
-            events_loop: Some(events_loop),
-            _window: window,
+            hal_state,
+            window_state,
         }
     }
 
-    fn init_window() -> (Window, EventsLoop) {
+    fn init_window() -> WindowState {
         let events_loop = EventsLoop::new();
         let window_builder = WindowBuilder::new()
             .with_dimensions(dpi::LogicalSize::new(1024., 768.))
             .with_title(WINDOW_NAME.to_string());
         let window = window_builder.build(&events_loop).unwrap();
-        (window, events_loop)
+
+        WindowState{
+            events_loop: Some(events_loop),
+            window,
+        }
     }
 
     fn init_hal(
         window: &Window,
-    ) -> (
-        back::Instance,
-        Adapter<back::Backend>,
-        <back::Backend as Backend>::Surface,
-        <back::Backend as Backend>::Device,
-        Vec<queue::CommandQueue<back::Backend, Graphics>>,
-        <back::Backend as Backend>::Swapchain,
-        format::Format,
-        Vec<(
-            <back::Backend as Backend>::Image,
-            <back::Backend as Backend>::ImageView,
-        )>,
-        <back::Backend as Backend>::RenderPass,
-        <back::Backend as Backend>::PipelineLayout,
-        Vec<<back::Backend as Backend>::DescriptorSetLayout>,
-        <back::Backend as Backend>::GraphicsPipeline,
-        Vec<<back::Backend as Backend>::Framebuffer>,
-        pool::CommandPool<back::Backend, Graphics>,
-        Vec<command::Submit<back::Backend, Graphics, command::MultiShot, command::Primary>>,
-        Vec<<back::Backend as Backend>::Semaphore>,
-        Vec<<back::Backend as Backend>::Semaphore>,
-        Vec<<back::Backend as Backend>::Fence>,
-    ) {
+    ) -> HALState {
         let instance = HelloTriangleApplication::create_instance();
         let mut adapter = HelloTriangleApplication::pick_adapter(&instance);
         let mut surface = HelloTriangleApplication::create_surface(&instance, window);
@@ -158,7 +111,7 @@ impl HelloTriangleApplication {
         let frame_images =
             HelloTriangleApplication::create_image_views(backbuffer, format, &device);
         let render_pass = HelloTriangleApplication::create_render_pass(&device, Some(format));
-        let (ds_layouts, pipeline_layout, gfx_pipeline) =
+        let (descriptor_set_layouts, pipeline_layout, gfx_pipeline) =
             HelloTriangleApplication::create_graphics_pipeline(&device, extent, &render_pass);
         let swapchain_framebuffers = HelloTriangleApplication::create_framebuffers(
             &device,
@@ -178,26 +131,26 @@ impl HelloTriangleApplication {
         let (image_available_semaphores, render_finished_semaphores, in_flight_fences) =
             HelloTriangleApplication::create_sync_objects(&device);
 
-        (
-            instance,
-            adapter,
-            surface,
-            device,
-            command_queues,
-            swapchain,
-            format,
-            frame_images,
-            render_pass,
-            pipeline_layout,
-            ds_layouts,
-            gfx_pipeline,
-            swapchain_framebuffers,
-            command_pool,
-            submission_command_buffers,
-            image_available_semaphores,
-            render_finished_semaphores,
-            in_flight_fences,
-        )
+        HALState {
+            in_flight_fences: Some(in_flight_fences),
+            render_finished_semaphores: Some(render_finished_semaphores),
+            image_available_semaphores: Some(image_available_semaphores),
+            submission_command_buffers: Some(submission_command_buffers),
+            command_pool: Some(command_pool),
+            swapchain_framebuffers: Some(swapchain_framebuffers),
+            gfx_pipeline: Some(gfx_pipeline),
+            descriptor_set_layouts: Some(descriptor_set_layouts),
+            pipeline_layout: Some(pipeline_layout),
+            render_pass: Some(render_pass),
+            frame_images: Some(frame_images),
+            _format: format,
+            swapchain: Some(swapchain),
+            command_queues: command_queues,
+            device: device,
+            _surface: surface,
+            _adapter: adapter,
+            _instance: instance,
+        }
     }
 
     fn create_instance() -> back::Instance {
@@ -410,7 +363,7 @@ impl HelloTriangleApplication {
             .create_shader_module(&frag_shader_code)
             .expect("Error creating fragment module.");
 
-        let (ds_layouts, pipeline_layout, gfx_pipeline) = {
+        let (descriptor_set_layouts, pipeline_layout, gfx_pipeline) = {
             let (vs_entry, fs_entry) = (
                 pso::EntryPoint::<back::Backend> {
                     entry: "main",
@@ -494,10 +447,10 @@ impl HelloTriangleApplication {
 
             let bindings = Vec::<pso::DescriptorSetLayoutBinding>::new();
             let immutable_samplers = Vec::<<back::Backend as Backend>::Sampler>::new();
-            let ds_layouts: Vec<<back::Backend as Backend>::DescriptorSetLayout> =
+            let descriptor_set_layouts: Vec<<back::Backend as Backend>::DescriptorSetLayout> =
                 vec![device.create_descriptor_set_layout(bindings, immutable_samplers)];
             let push_constants = Vec::<(pso::ShaderStageFlags, std::ops::Range<u32>)>::new();
-            let layout = device.create_pipeline_layout(&ds_layouts, push_constants);
+            let layout = device.create_pipeline_layout(&descriptor_set_layouts, push_constants);
 
             let subpass = pass::Subpass {
                 index: 0,
@@ -530,13 +483,13 @@ impl HelloTriangleApplication {
                     .expect("failed to create graphics pipeline!")
             };
 
-            (ds_layouts, layout, gfx_pipeline)
+            (descriptor_set_layouts, layout, gfx_pipeline)
         };
 
         device.destroy_shader_module(vert_shader_module);
         device.destroy_shader_module(frag_shader_module);
 
-        (ds_layouts, pipeline_layout, gfx_pipeline)
+        (descriptor_set_layouts, pipeline_layout, gfx_pipeline)
     }
 
     fn create_framebuffers(
@@ -709,6 +662,7 @@ impl HelloTriangleApplication {
         let mut current_frame: usize = 0;
 
         let mut events_loop = self
+            .window_state
             .events_loop
             .take()
             .expect("events_loop does not exist!");
@@ -717,16 +671,16 @@ impl HelloTriangleApplication {
                 event: WindowEvent::CloseRequested,
                 ..
             } => {
-                self.device.wait_idle().expect("Queues are not going idle!");
+                self.hal_state.device.wait_idle().expect("Queues are not going idle!");
                 ControlFlow::Break
             }
             _ => {
                 match (
-                    &mut self.swapchain,
-                    &self.submission_command_buffers,
-                    &self.image_available_semaphores,
-                    &self.render_finished_semaphores,
-                    &self.in_flight_fences,
+                    &mut self.hal_state.swapchain,
+                    &self.hal_state.submission_command_buffers,
+                    &self.hal_state.image_available_semaphores,
+                    &self.hal_state.render_finished_semaphores,
+                    &self.hal_state.in_flight_fences,
                 ) {
                     (
                         Some(swapchain),
@@ -736,8 +690,8 @@ impl HelloTriangleApplication {
                         Some(in_flight_fences),
                     ) => {
                         HelloTriangleApplication::draw_frame(
-                            &self.device,
-                            &mut self.command_queues,
+                            &self.hal_state.device,
+                            &mut self.hal_state.command_queues,
                             swapchain,
                             &submission_command_buffers,
                             &image_available_semaphores[current_frame],
@@ -754,7 +708,7 @@ impl HelloTriangleApplication {
                 ControlFlow::Continue
             }
         });
-        self.events_loop = Some(events_loop);
+        self.window_state.events_loop = Some(events_loop);
     }
 
     pub fn run(&mut self) {
@@ -762,7 +716,7 @@ impl HelloTriangleApplication {
     }
 }
 
-impl Drop for HelloTriangleApplication {
+impl Drop for HALState {
     fn drop(&mut self) {
         match self.in_flight_fences.take() {
             Some(fences) => {
