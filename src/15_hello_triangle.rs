@@ -15,9 +15,11 @@ use hal::{
     Swapchain, SwapchainConfig,
 };
 use std::io::Read;
+use std::mem::ManuallyDrop;
+use std::ptr;
 use winit::{dpi, ControlFlow, Event, EventsLoop, Window, WindowBuilder, WindowEvent};
 
-static WINDOW_NAME: &str = "09_shader_modules";
+static WINDOW_NAME: &str = "15_shader_modules";
 const MAX_FRAMES_IN_FLIGHT: usize = 2;
 
 fn main() {
@@ -32,25 +34,24 @@ struct WindowState {
 }
 
 struct HALState {
-    in_flight_fences: Option<Vec<<back::Backend as Backend>::Fence>>,
-    render_finished_semaphores: Option<Vec<<back::Backend as Backend>::Semaphore>>,
-    image_available_semaphores: Option<Vec<<back::Backend as Backend>::Semaphore>>,
-    submission_command_buffers:
-        Option<Vec<command::Submit<back::Backend, Graphics, command::MultiShot, command::Primary>>>,
-    command_pool: Option<pool::CommandPool<back::Backend, Graphics>>,
-    swapchain_framebuffers: Option<Vec<<back::Backend as Backend>::Framebuffer>>,
-    gfx_pipeline: Option<<back::Backend as Backend>::GraphicsPipeline>,
-    descriptor_set_layouts: Option<Vec<<back::Backend as Backend>::DescriptorSetLayout>>,
-    pipeline_layout: Option<<back::Backend as Backend>::PipelineLayout>,
-    render_pass: Option<<back::Backend as Backend>::RenderPass>,
-    frame_images: Option<
+    in_flight_fences: ManuallyDrop<Vec<<back::Backend as Backend>::Fence>>,
+    render_finished_semaphores: ManuallyDrop<Vec<<back::Backend as Backend>::Semaphore>>,
+    image_available_semaphores: ManuallyDrop<Vec<<back::Backend as Backend>::Semaphore>>,
+    submission_command_buffers: Vec<command::Submit<back::Backend, Graphics, command::MultiShot, command::Primary>>,
+    command_pool: ManuallyDrop<pool::CommandPool<back::Backend, Graphics>>,
+    swapchain_framebuffers: ManuallyDrop<Vec<<back::Backend as Backend>::Framebuffer>>,
+    gfx_pipeline: ManuallyDrop<<back::Backend as Backend>::GraphicsPipeline>,
+    descriptor_set_layouts: ManuallyDrop<Vec<<back::Backend as Backend>::DescriptorSetLayout>>,
+    pipeline_layout: ManuallyDrop<<back::Backend as Backend>::PipelineLayout>,
+    render_pass: ManuallyDrop<<back::Backend as Backend>::RenderPass>,
+    frame_images: ManuallyDrop<
         Vec<(
             <back::Backend as Backend>::Image,
             <back::Backend as Backend>::ImageView,
         )>,
     >,
     _format: format::Format,
-    swapchain: Option<<back::Backend as Backend>::Swapchain>,
+    swapchain: ManuallyDrop<<back::Backend as Backend>::Swapchain>,
     command_queues: Vec<queue::CommandQueue<back::Backend, Graphics>>,
     device: <back::Backend as Backend>::Device,
     _surface: <back::Backend as Backend>::Surface,
@@ -132,21 +133,21 @@ impl HelloTriangleApplication {
             HelloTriangleApplication::create_sync_objects(&device);
 
         HALState {
-            in_flight_fences: Some(in_flight_fences),
-            render_finished_semaphores: Some(render_finished_semaphores),
-            image_available_semaphores: Some(image_available_semaphores),
-            submission_command_buffers: Some(submission_command_buffers),
-            command_pool: Some(command_pool),
-            swapchain_framebuffers: Some(swapchain_framebuffers),
-            gfx_pipeline: Some(gfx_pipeline),
-            descriptor_set_layouts: Some(descriptor_set_layouts),
-            pipeline_layout: Some(pipeline_layout),
-            render_pass: Some(render_pass),
-            frame_images: Some(frame_images),
+            in_flight_fences: ManuallyDrop::new(in_flight_fences),
+            render_finished_semaphores: ManuallyDrop::new(render_finished_semaphores),
+            image_available_semaphores: ManuallyDrop::new(image_available_semaphores),
+            submission_command_buffers,
+            command_pool: ManuallyDrop::new(command_pool),
+            swapchain_framebuffers: ManuallyDrop::new(swapchain_framebuffers),
+            gfx_pipeline: ManuallyDrop::new(gfx_pipeline),
+            descriptor_set_layouts: ManuallyDrop::new(descriptor_set_layouts),
+            pipeline_layout: ManuallyDrop::new(pipeline_layout),
+            render_pass: ManuallyDrop::new(render_pass),
+            frame_images: ManuallyDrop::new(frame_images),
             _format: format,
-            swapchain: Some(swapchain),
-            command_queues: command_queues,
-            device: device,
+            swapchain: ManuallyDrop::new(swapchain),
+            command_queues,
+            device,
             _surface: surface,
             _adapter: adapter,
             _instance: instance,
@@ -675,34 +676,15 @@ impl HelloTriangleApplication {
                 ControlFlow::Break
             }
             _ => {
-                match (
+                HelloTriangleApplication::draw_frame(
+                    &self.hal_state.device,
+                    &mut self.hal_state.command_queues,
                     &mut self.hal_state.swapchain,
                     &self.hal_state.submission_command_buffers,
-                    &self.hal_state.image_available_semaphores,
-                    &self.hal_state.render_finished_semaphores,
-                    &self.hal_state.in_flight_fences,
-                ) {
-                    (
-                        Some(swapchain),
-                        Some(submission_command_buffers),
-                        Some(image_available_semaphores),
-                        Some(render_finished_semaphores),
-                        Some(in_flight_fences),
-                    ) => {
-                        HelloTriangleApplication::draw_frame(
-                            &self.hal_state.device,
-                            &mut self.hal_state.command_queues,
-                            swapchain,
-                            &submission_command_buffers,
-                            &image_available_semaphores[current_frame],
-                            &render_finished_semaphores[current_frame],
-                            &in_flight_fences[current_frame],
-                        );
-                    }
-                    _ => {
-                        panic!("One of requisite arguments for draw_frame does not exist!");
-                    }
-                }
+                    &self.hal_state.image_available_semaphores[current_frame],
+                    &self.hal_state.render_finished_semaphores[current_frame],
+                    &self.hal_state.in_flight_fences[current_frame],
+                );
 
                 current_frame = (current_frame + 1) % MAX_FRAMES_IN_FLIGHT;;
                 ControlFlow::Continue
@@ -716,95 +698,92 @@ impl HelloTriangleApplication {
     }
 }
 
+unsafe fn drop_fences(device: &<back::Backend as Backend>::Device, fences: &mut ManuallyDrop<Vec<<back::Backend as Backend>::Fence>>) {
+    for f in ManuallyDrop::into_inner(ptr::read(fences)) {
+        device.destroy_fence(f);
+    }
+    ManuallyDrop::drop(fences);
+}
+
+unsafe fn drop_semaphores(device: &<back::Backend as Backend>::Device, semaphores: &mut ManuallyDrop<Vec<<back::Backend as Backend>::Semaphore>>) {
+    for s in ManuallyDrop::into_inner(ptr::read(semaphores)) {
+        device.destroy_semaphore(s);
+    }
+    ManuallyDrop::drop(semaphores);
+}
+
+unsafe fn drop_command_pool(device: &<back::Backend as Backend>::Device, command_pool: &mut ManuallyDrop<pool::CommandPool<back::Backend, Graphics>>) {
+    device.destroy_command_pool(ManuallyDrop::into_inner(ptr::read(command_pool)).into_raw());
+    ManuallyDrop::drop(command_pool);
+}
+
+unsafe fn drop_framebuffers(device: &<back::Backend as Backend>::Device, framebuffers: &mut ManuallyDrop<Vec<<back::Backend as Backend>::Framebuffer>>) {
+    for fb in ManuallyDrop::into_inner(ptr::read(framebuffers)) {
+        device.destroy_framebuffer(fb);
+    }
+    ManuallyDrop::drop(framebuffers);
+}
+
+unsafe fn drop_graphics_pipeline(device: &<back::Backend as Backend>::Device, gfx_pipeline: &mut ManuallyDrop<<back::Backend as Backend>::GraphicsPipeline>) {
+    device.destroy_graphics_pipeline(ManuallyDrop::into_inner(ptr::read(gfx_pipeline)));
+    ManuallyDrop::drop(gfx_pipeline);
+}
+
+unsafe fn drop_descriptor_set_layouts(device: &<back::Backend as Backend>::Device, descriptor_set_layouts: &mut ManuallyDrop<Vec<<back::Backend as Backend>::DescriptorSetLayout>>) {
+    for dsl in ManuallyDrop::into_inner(ptr::read(descriptor_set_layouts)) {
+        device.destroy_descriptor_set_layout(dsl);
+    }
+    ManuallyDrop::drop(descriptor_set_layouts);
+}
+
+unsafe fn drop_pipeline_layout(device: &<back::Backend as Backend>::Device, pipeline_layout: &mut ManuallyDrop<<back::Backend as Backend>::PipelineLayout>) {
+    device.destroy_pipeline_layout(ManuallyDrop::into_inner(ptr::read(pipeline_layout)));
+    ManuallyDrop::drop(pipeline_layout);
+}
+
+unsafe fn drop_render_pass(device: &<back::Backend as Backend>::Device, render_pass: &mut ManuallyDrop<<back::Backend as Backend>::RenderPass>) {
+    device.destroy_render_pass(ManuallyDrop::into_inner(ptr::read(render_pass)));
+    ManuallyDrop::drop(render_pass);
+}
+
+unsafe fn drop_frame_images(device: &<back::Backend as Backend>::Device, frame_images: &mut ManuallyDrop<Vec<(<back::Backend as Backend>::Image, <back::Backend as Backend>::ImageView,)>>) {
+    for (_, iv) in (ManuallyDrop::into_inner(ptr::read(frame_images))).into_iter() {
+        device.destroy_image_view(iv);
+    }
+    ManuallyDrop::drop(frame_images);
+}
+
+unsafe fn drop_swapchain(device: &<back::Backend as Backend>::Device, swapchain: &mut ManuallyDrop<<back::Backend as Backend>::Swapchain>) {
+    device.destroy_swapchain(ManuallyDrop::into_inner(ptr::read(swapchain)));
+    ManuallyDrop::drop(swapchain);
+}
+
 impl Drop for HALState {
     fn drop(&mut self) {
-        match self.in_flight_fences.take() {
-            Some(fences) => {
-                for f in fences {
-                    self.device.destroy_fence(f);
-                }
-            }
-            _ => {}
-        }
+        unsafe {
+            let device = &self.device;
 
-        match self.render_finished_semaphores.take() {
-            Some(sems) => {
-                for s in sems {
-                    self.device.destroy_semaphore(s);
-                }
-            }
-            _ => {}
-        }
+            drop_fences(device, &mut self.in_flight_fences);
 
-        match self.image_available_semaphores.take() {
-            Some(sems) => {
-                for s in sems {
-                    self.device.destroy_semaphore(s);
-                }
-            }
-            _ => {}
-        }
+            drop_semaphores(device, &mut self.image_available_semaphores);
 
-        match self.command_pool.take() {
-            Some(cp) => {
-                self.device.destroy_command_pool(cp.into_raw());
-            }
-            _ => {}
-        }
+            drop_semaphores(device, &mut self.render_finished_semaphores);
 
-        match self.swapchain_framebuffers.take() {
-            Some(fbs) => {
-                for fb in fbs {
-                    self.device.destroy_framebuffer(fb);
-                }
-            }
-            _ => {}
-        }
+            drop_command_pool(device, &mut self.command_pool);
 
-        match self.gfx_pipeline.take() {
-            Some(gp) => {
-                self.device.destroy_graphics_pipeline(gp);
-            }
-            _ => {}
-        }
+            drop_framebuffers(device, &mut self.swapchain_framebuffers);
 
-        match self.descriptor_set_layouts.take() {
-            Some(dsls) => {
-                for dsl in dsls {
-                    self.device.destroy_descriptor_set_layout(dsl);
-                }
-            }
-            _ => {}
-        }
+            drop_graphics_pipeline(device, &mut self.gfx_pipeline);
 
-        match self.pipeline_layout.take() {
-            Some(pl) => {
-                self.device.destroy_pipeline_layout(pl);
-            }
-            _ => {}
-        }
+            drop_descriptor_set_layouts(device, &mut self.descriptor_set_layouts);
 
-        match self.render_pass.take() {
-            Some(rp) => {
-                self.device.destroy_render_pass(rp);
-            }
-            _ => {}
-        }
+            drop_pipeline_layout(device, &mut self.pipeline_layout);
 
-        match self.frame_images.take() {
-            Some(fis) => {
-                for (_, v) in fis {
-                    self.device.destroy_image_view(v);
-                }
-            }
-            _ => {}
-        }
+            drop_render_pass(device, &mut self.render_pass);
 
-        match self.swapchain.take() {
-            Some(swapchain) => {
-                self.device.destroy_swapchain(swapchain);
-            }
-            _ => {}
+            drop_frame_images(device, &mut self.frame_images);
+
+            drop_swapchain(device, &mut self.swapchain);
         }
     }
 }
