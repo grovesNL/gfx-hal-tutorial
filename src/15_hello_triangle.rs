@@ -26,6 +26,7 @@ fn main() {
     env_logger::init();
     let mut application = HelloTriangleApplication::init();
     application.run();
+    application.cleanup();
 }
 
 struct WindowState {
@@ -57,6 +58,30 @@ struct HALState {
     _surface: <back::Backend as Backend>::Surface,
     _adapter: Adapter<back::Backend>,
     _instance: back::Instance,
+}
+
+impl HALState {
+    fn cleanup(self) {
+        unsafe {
+            let device = &self.device;
+            let fences = ManuallyDrop::into_inner(self.in_flight_fences);
+            for fence in fences {
+                device.destroy_fence(fence);
+            }
+            //ManuallyDrop::into_inner(&mut self.in_flight_fences);
+            /*drop_fences(device, &mut self.in_flight_fences);
+            drop_semaphores(device, &mut self.image_available_semaphores);
+            drop_semaphores(device, &mut self.render_finished_semaphores);
+            drop_command_pool(device, &mut self.command_pool);
+            drop_framebuffers(device, &mut self.swapchain_framebuffers);
+            drop_graphics_pipeline(device, &mut self.gfx_pipeline);
+            drop_descriptor_set_layouts(device, &mut self.descriptor_set_layouts);
+            drop_pipeline_layout(device, &mut self.pipeline_layout);
+            drop_render_pass(device, &mut self.render_pass);
+            drop_frame_images(device, &mut self.frame_images);
+            drop_swapchain(device, &mut self.swapchain);*/
+        }
+    }
 }
 
 struct HelloTriangleApplication {
@@ -696,6 +721,10 @@ impl HelloTriangleApplication {
     pub fn run(&mut self) {
         self.main_loop();
     }
+
+    pub fn cleanup(self) {
+        self.hal_state.cleanup();
+    }
 }
 
 unsafe fn drop_fences(device: &<back::Backend as Backend>::Device, fences: &mut ManuallyDrop<Vec<<back::Backend as Backend>::Fence>>) {
@@ -756,34 +785,4 @@ unsafe fn drop_frame_images(device: &<back::Backend as Backend>::Device, frame_i
 unsafe fn drop_swapchain(device: &<back::Backend as Backend>::Device, swapchain: &mut ManuallyDrop<<back::Backend as Backend>::Swapchain>) {
     device.destroy_swapchain(ManuallyDrop::into_inner(ptr::read(swapchain)));
     ManuallyDrop::drop(swapchain);
-}
-
-impl Drop for HALState {
-    fn drop(&mut self) {
-        unsafe {
-            let device = &self.device;
-
-            drop_fences(device, &mut self.in_flight_fences);
-
-            drop_semaphores(device, &mut self.image_available_semaphores);
-
-            drop_semaphores(device, &mut self.render_finished_semaphores);
-
-            drop_command_pool(device, &mut self.command_pool);
-
-            drop_framebuffers(device, &mut self.swapchain_framebuffers);
-
-            drop_graphics_pipeline(device, &mut self.gfx_pipeline);
-
-            drop_descriptor_set_layouts(device, &mut self.descriptor_set_layouts);
-
-            drop_pipeline_layout(device, &mut self.pipeline_layout);
-
-            drop_render_pass(device, &mut self.render_pass);
-
-            drop_frame_images(device, &mut self.frame_images);
-
-            drop_swapchain(device, &mut self.swapchain);
-        }
-    }
 }
