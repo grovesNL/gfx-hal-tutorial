@@ -7,42 +7,86 @@ extern crate gfx_backend_vulkan as back;
 extern crate gfx_hal as hal;
 extern crate winit;
 
+use winit::{dpi, ControlFlow, Event, EventsLoop, Window, WindowBuilder, WindowEvent};
+
 static WINDOW_NAME: &str = "01_instance_creation";
 
 fn main() {
-    let (_window, events_loop) = init_window();
-    init_hal();
-    main_loop(events_loop);
-    clean_up();
+    let mut application = HelloTriangleApplication::init();
+    application.run();
+    application.clean_up();
 }
 
-fn init_window() -> (winit::Window, winit::EventsLoop) {
-    let events_loop = winit::EventsLoop::new();
-    let window_builder = winit::WindowBuilder::new()
-        .with_dimensions(winit::dpi::LogicalSize::new(1024., 768.))
-        .with_title(WINDOW_NAME.to_string());
-    let window = window_builder.build(&events_loop).unwrap();
-    (window, events_loop)
+struct WindowState {
+    events_loop: EventsLoop,
+    _window: Window,
 }
 
-fn create_instance() -> back::Instance {
-    back::Instance::create(WINDOW_NAME, 1)
+struct HalState {
+    _instance: back::Instance,
 }
 
-fn init_hal() {
-    let _instance = create_instance();
+impl HalState {
+    fn clean_up(self) {}
 }
 
-fn clean_up() {
-    // HAL has implemented automatic destruction of instance
+struct HelloTriangleApplication {
+    hal_state: HalState,
+    window_state: WindowState,
 }
 
-fn main_loop(mut events_loop: winit::EventsLoop) {
-    events_loop.run_forever(|event| match event {
-        winit::Event::WindowEvent {
-            event: winit::WindowEvent::CloseRequested,
-            ..
-        } => winit::ControlFlow::Break,
-        _ => winit::ControlFlow::Continue,
-    });
+impl HelloTriangleApplication {
+    pub fn init() -> HelloTriangleApplication {
+        let window_state = HelloTriangleApplication::init_window();
+        let hal_state = HelloTriangleApplication::init_hal();
+
+        HelloTriangleApplication {
+            hal_state,
+            window_state,
+        }
+    }
+
+    fn init_window() -> WindowState {
+        let events_loop = EventsLoop::new();
+        let window_builder = WindowBuilder::new()
+            .with_dimensions(dpi::LogicalSize::new(1024., 768.))
+            .with_title(WINDOW_NAME.to_string());
+        let window = window_builder.build(&events_loop).unwrap();
+        WindowState {
+            events_loop,
+            _window: window,
+        }
+    }
+
+    fn init_hal() -> HalState {
+        let instance = HelloTriangleApplication::create_instance();
+        HalState {
+            _instance: instance,
+        }
+    }
+
+    fn create_instance() -> back::Instance {
+        back::Instance::create(WINDOW_NAME, 1)
+    }
+
+    fn main_loop(&mut self) {
+        self.window_state
+            .events_loop
+            .run_forever(|event| match event {
+                Event::WindowEvent {
+                    event: WindowEvent::CloseRequested,
+                    ..
+                } => ControlFlow::Break,
+                _ => ControlFlow::Continue,
+            });
+    }
+
+    fn run(&mut self) {
+        self.main_loop();
+    }
+
+    fn clean_up(self) {
+        self.hal_state.clean_up();
+    }
 }
+
