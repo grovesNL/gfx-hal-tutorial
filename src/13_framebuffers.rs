@@ -22,7 +22,9 @@ fn main() {
     env_logger::init();
     let mut application = HelloTriangleApplication::init();
     application.run();
-    application.clean_up();
+    unsafe {
+        application.clean_up();
+    }
 }
 
 struct WindowState {
@@ -50,7 +52,7 @@ struct HalState {
 }
 
 impl HalState {
-    fn clean_up(self) {
+    unsafe fn clean_up(self) {
         let device = &self.device;
 
         for framebuffer in self.swapchain_framebuffers {
@@ -94,7 +96,7 @@ impl QueueFamilyIds {
 impl HelloTriangleApplication {
     pub fn init() -> HelloTriangleApplication {
         let window_state = HelloTriangleApplication::init_window();
-        let hal_state = HelloTriangleApplication::init_hal(&window_state.window);
+        let hal_state = unsafe { HelloTriangleApplication::init_hal(&window_state.window) };
 
         HelloTriangleApplication {
             hal_state,
@@ -115,7 +117,7 @@ impl HelloTriangleApplication {
         }
     }
 
-    fn init_hal(window: &Window) -> HalState {
+    unsafe fn init_hal(window: &Window) -> HalState {
         let instance = HelloTriangleApplication::create_instance();
         let mut adapter = HelloTriangleApplication::pick_adapter(&instance);
         let mut surface = HelloTriangleApplication::create_surface(&instance, window);
@@ -207,16 +209,18 @@ impl HelloTriangleApplication {
                 Graphics::supported_by(family.queue_type())
                     && family.max_queues() > 0
                     && surface.supports_queue_family(family)
-            }).expect("Could not find a queue family supporting graphics.");
+            })
+            .expect("Could not find a queue family supporting graphics.");
 
         let priorities = vec![1.0; 1];
-
         let families = [(family, priorities.as_slice())];
 
-        let Gpu { device, mut queues } = adapter
-            .physical_device
-            .open(&families)
-            .expect("Could not create device.");
+        let Gpu { device, mut queues } = unsafe {
+            adapter
+                .physical_device
+                .open(&families)
+                .expect("Could not create device.")
+        };
 
         let mut queue_group = queues
             .take::<Graphics>(family.id())
@@ -238,7 +242,8 @@ impl HelloTriangleApplication {
         Backbuffer<back::Backend>,
         format::Format,
     ) {
-        let (caps, formats, _present_modes) = surface.compatibility(&adapter.physical_device);
+        let (caps, formats, _present_modes, _composite_alphas) =
+            surface.compatibility(&adapter.physical_device);
 
         let format = formats.map_or(format::Format::Rgba8Srgb, |formats| {
             formats
@@ -248,15 +253,18 @@ impl HelloTriangleApplication {
                 .unwrap_or(formats[0])
         });
 
-        let swap_config = SwapchainConfig::from_caps(&caps, format);
+        let swap_config = SwapchainConfig::from_caps(&caps, format, caps.extents.end);
         let extent = swap_config.extent;
-        let (swapchain, backbuffer) =
-            device.create_swapchain(surface, swap_config, previous_swapchain);
+        let (swapchain, backbuffer) = unsafe {
+            device
+                .create_swapchain(surface, swap_config, previous_swapchain)
+                .unwrap()
+        };
 
         (swapchain, extent, backbuffer, format)
     }
 
-    fn create_image_views(
+    unsafe fn create_image_views(
         backbuffer: Backbuffer<back::Backend>,
         format: format::Format,
         device: &<back::Backend as Backend>::Device,
@@ -284,7 +292,8 @@ impl HelloTriangleApplication {
                     };
 
                     (image, image_view)
-                }).collect(),
+                })
+                .collect(),
             _ => unimplemented!(),
         }
     }
@@ -323,10 +332,14 @@ impl HelloTriangleApplication {
             preserves: &[],
         };
 
-        device.create_render_pass(&[color_attachment], &[subpass], &[])
+        unsafe {
+            device
+                .create_render_pass(&[color_attachment], &[subpass], &[])
+                .unwrap()
+        }
     }
 
-    fn create_graphics_pipeline(
+    unsafe fn create_graphics_pipeline(
         device: &<back::Backend as Backend>::Device,
         extent: window::Extent2D,
         render_pass: &<back::Backend as Backend>::RenderPass,
@@ -338,7 +351,8 @@ impl HelloTriangleApplication {
         let vert_shader_code = glsl_to_spirv::compile(
             include_str!("09_shader_base.vert"),
             glsl_to_spirv::ShaderType::Vertex,
-        ).expect("Error compiling vertex shader code.")
+        )
+        .expect("Error compiling vertex shader code.")
         .bytes()
         .map(|b| b.unwrap())
         .collect::<Vec<u8>>();
@@ -346,7 +360,8 @@ impl HelloTriangleApplication {
         let frag_shader_code = glsl_to_spirv::compile(
             include_str!("09_shader_base.frag"),
             glsl_to_spirv::ShaderType::Fragment,
-        ).expect("Error compiling fragment shader code.")
+        )
+        .expect("Error compiling fragment shader code.")
         .bytes()
         .map(|b| b.unwrap())
         .collect::<Vec<u8>>();
@@ -363,12 +378,18 @@ impl HelloTriangleApplication {
                 pso::EntryPoint::<back::Backend> {
                     entry: "main",
                     module: &vert_shader_module,
-                    specialization: &[],
+                    specialization: hal::pso::Specialization {
+                        constants: &[],
+                        data: &[],
+                    },
                 },
                 pso::EntryPoint::<back::Backend> {
                     entry: "main",
                     module: &frag_shader_module,
-                    specialization: &[],
+                    specialization: hal::pso::Specialization {
+                        constants: &[],
+                        data: &[],
+                    },
                 },
             );
 
@@ -442,10 +463,13 @@ impl HelloTriangleApplication {
 
             let bindings = Vec::<pso::DescriptorSetLayoutBinding>::new();
             let immutable_samplers = Vec::<<back::Backend as Backend>::Sampler>::new();
-            let ds_layouts: Vec<<back::Backend as Backend>::DescriptorSetLayout> =
-                vec![device.create_descriptor_set_layout(bindings, immutable_samplers)];
+            let ds_layouts: Vec<<back::Backend as Backend>::DescriptorSetLayout> = vec![device
+                .create_descriptor_set_layout(bindings, immutable_samplers)
+                .unwrap()];
             let push_constants = Vec::<(pso::ShaderStageFlags, std::ops::Range<u32>)>::new();
-            let layout = device.create_pipeline_layout(&ds_layouts, push_constants);
+            let layout = device
+                .create_pipeline_layout(&ds_layouts, push_constants)
+                .unwrap();
 
             let subpass = pass::Subpass {
                 index: 0,
@@ -498,19 +522,22 @@ impl HelloTriangleApplication {
     ) -> Vec<<back::Backend as Backend>::Framebuffer> {
         let mut swapchain_framebuffers: Vec<<back::Backend as Backend>::Framebuffer> = Vec::new();
 
-        for (_, image_view) in frame_images.iter() {
-            swapchain_framebuffers.push(
-                device
-                    .create_framebuffer(
-                        render_pass,
-                        vec![image_view],
-                        image::Extent {
-                            width: extent.width as _,
-                            height: extent.height as _,
-                            depth: 1,
-                        },
-                    ).expect("failed to create framebuffer!"),
-            );
+        unsafe {
+            for (_, image_view) in frame_images.iter() {
+                swapchain_framebuffers.push(
+                    device
+                        .create_framebuffer(
+                            render_pass,
+                            vec![image_view],
+                            image::Extent {
+                                width: extent.width as _,
+                                height: extent.height as _,
+                                depth: 1,
+                            },
+                        )
+                        .expect("failed to create framebuffer!"),
+                );
+            }
         }
 
         swapchain_framebuffers
@@ -532,8 +559,7 @@ impl HelloTriangleApplication {
         self.main_loop();
     }
 
-    fn clean_up(self) {
+    unsafe fn clean_up(self) {
         self.hal_state.clean_up();
     }
 }
-

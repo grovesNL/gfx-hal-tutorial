@@ -138,13 +138,14 @@ impl HelloTriangleApplication {
 
         // we only want to create a single queue
         let priorities = vec![1.0; 1];
-
         let families = [(family, priorities.as_slice())];
 
-        let Gpu { device, mut queues } = adapter
-            .physical_device
-            .open(&families)
-            .expect("Could not create device.");
+        let Gpu { device, mut queues } = unsafe {
+            adapter
+                .physical_device
+                .open(&families)
+                .expect("Could not create device.")
+        };
 
         let mut queue_group = queues
             .take::<Graphics>(family.id())
@@ -175,4 +176,3 @@ impl HelloTriangleApplication {
         self.hal_state.clean_up();
     }
 }
-

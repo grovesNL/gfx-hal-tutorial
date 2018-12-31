@@ -136,4 +136,3 @@ impl HelloTriangleApplication {
         self.hal_state.clean_up();
     }
 }
-
