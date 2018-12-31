@@ -16,7 +16,7 @@ use hal::{
 use std::io::Read;
 use winit::{dpi, ControlFlow, Event, EventsLoop, Window, WindowBuilder, WindowEvent};
 
-static WINDOW_NAME: &str = "09_shader_modules";
+static WINDOW_NAME: &str = "12_graphics_pipeline_complete";
 
 fn main() {
     env_logger::init();

@@ -17,7 +17,7 @@ use hal::{
 use std::io::Read;
 use winit::{dpi, ControlFlow, Event, EventsLoop, Window, WindowBuilder, WindowEvent};
 
-static WINDOW_NAME: &str = "15_shader_modules";
+static WINDOW_NAME: &str = "15_hello_triangle";
 const MAX_FRAMES_IN_FLIGHT: usize = 2;
 
 fn main() {
