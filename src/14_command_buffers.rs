@@ -11,8 +11,8 @@ extern crate winit;
 
 use hal::{
     command, format, image, pass, pool, pso, queue, window, Adapter, Backbuffer, Backend,
-    Capability, Device, Gpu, Graphics, Instance, PhysicalDevice, Primitive, QueueFamily, Surface,
-    SwapchainConfig,
+    Capability, Device, Features, Gpu, Graphics, Instance, PhysicalDevice, Primitive, QueueFamily,
+    Surface, SwapchainConfig,
 };
 use std::io::Read;
 use winit::{dpi, ControlFlow, Event, EventsLoop, Window, WindowBuilder, WindowEvent};
@@ -237,7 +237,7 @@ impl HelloTriangleApplication {
         let Gpu { device, mut queues } = unsafe {
             adapter
                 .physical_device
-                .open(&families)
+                .open(&families, Features::empty())
                 .expect("Could not create device.")
         };
 
@@ -465,7 +465,7 @@ impl HelloTriangleApplication {
                         x: 0,
                         y: 0,
                         w: extent.width as i16,
-                        h: extent.width as i16,
+                        h: extent.height as i16,
                     },
                     depth: (0.0..1.0),
                 }),

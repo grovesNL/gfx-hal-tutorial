@@ -9,8 +9,8 @@ extern crate gfx_hal as hal;
 extern crate winit;
 
 use hal::{
-    queue, Adapter, Backend, Capability, Gpu, Graphics, Instance, PhysicalDevice, QueueFamily,
-    Surface,
+    queue, Adapter, Backend, Capability, Features, Gpu, Graphics, Instance, PhysicalDevice,
+    QueueFamily, Surface,
 };
 use winit::{dpi, ControlFlow, Event, EventsLoop, Window, WindowBuilder, WindowEvent};
 
@@ -160,7 +160,7 @@ impl HelloTriangleApplication {
         let Gpu { device, mut queues } = unsafe {
             adapter
                 .physical_device
-                .open(&families)
+                .open(&families, Features::empty())
                 .expect("Could not create device.")
         };
 
